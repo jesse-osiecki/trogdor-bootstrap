@@ -1,0 +1,121 @@
+#!/usr/bin/python3
+"""Explain recent Howdy face-unlock attempts from the journal.
+
+Usage: howdy-why [-n COUNT] [--since WHEN] [--all]
+  default: the most recent attempt in the last 24 h; -n 5 shows the last five;
+  --since accepts journalctl syntax ("-2h", "today", "2026-09-13 18:00").
+
+Howdy runs as a child of the lock-screen greeter, so pam_howdy's verdict is
+tagged pam_howdy and compare.py's own output (rubber stamp chatter when
+verbose_stamps = true) lands under the greeter's tag, usually
+kwin_wayland_wrapper. This groups the two by time and says what happened.
+"""
+import argparse
+import re
+import subprocess
+import sys
+from datetime import datetime, timedelta
+
+VERDICTS = {
+    "Login approved": ("approved", "face matched and the nod check passed"),
+    "Failure, timeout reached": ("no face", "no matching face within the timeout: either the detector never found a face or it did not match an enrolled model"),
+    "Failure, no face model known": ("no model", "no face model enrolled for this user (sudo howdy add <label>)"),
+    "Failure, general abort": ("abort", "compare.py aborted (bad config or a stamp rule it could not parse)"),
+    "Failure, image too dark": ("dark", "every frame was darker than dark_threshold"),
+    "Failure, not possible to open camera at configured path": ("no camera", "could not open the camera: PipeWire target missing or pipewire not running for the user"),
+    "Skipped authentication, Howdy is disabled": ("skipped", "howdy is disabled in config.ini"),
+    "Skipped authentication, closed lid detected": ("skipped", "lid closed, howdy skipped"),
+    "Skipped authentication, SSH session detected": ("skipped", "SSH session, howdy skipped"),
+}
+STAMP_RE = re.compile(r"(Stamp \"|Executing stamp|Installed rubberstamps|All rubberstamps|Authentication aborted by rubber stamp|Internal error in rubberstamp|Traceback|Sending command to howdy-gtk|Timeout reached|Nod|nod)")
+LINE_RE = re.compile(r"^(\S+) \S+ ([^\[\]:]+)\[(\d+)\]: (.*)$")
+
+
+def journal(since):
+    cmd = ["journalctl", "--no-pager", "-o", "short-iso", "--since", since]
+    out = subprocess.run(cmd, capture_output=True, text=True)
+    if out.returncode != 0:
+        sys.exit("journalctl failed: " + out.stderr.strip())
+    return out.stdout.splitlines()
+
+
+def parse(lines):
+    """Return (attempts, chatter): pam_howdy verdicts and stamp-related lines"""
+    attempts, chatter = [], []
+    for line in lines:
+        m = LINE_RE.match(line)
+        if not m:
+            continue
+        ts, tag, pid, msg = m.groups()
+        try:
+            t = datetime.fromisoformat(ts)
+        except ValueError:
+            continue
+        if tag == "pam_howdy" and not msg.startswith("pam_"):
+            attempts.append((t, int(pid), msg))
+        elif tag != "pam_howdy" and STAMP_RE.search(msg) and "SyntaxWarning" not in msg:
+            chatter.append((t, msg.strip()))
+    return attempts, chatter
+
+
+def explain(t, msg, chatter):
+    label, why = None, None
+    for key, (lab, text) in VERDICTS.items():
+        if msg.startswith(key):
+            label, why = lab, text
+    m = re.match(r"Failure, unknown error (\d+)", msg)
+    stamp_lines = [c for c in chatter if t - timedelta(seconds=40) <= c[0] <= t + timedelta(seconds=2)]
+    if m:
+        code = int(m.group(1))
+        if code == 15:
+            label = "stamp failed"
+            if any("Internal error in rubberstamp" in c or "Traceback" in c for _, c in stamp_lines):
+                why = "face matched, then the nod stamp CRASHED (faildeadly => failure); traceback is in the journal"
+            elif any("M=Aborted authentication" in c for _, c in stamp_lines):
+                why = "face matched, then you SHOOK your head (or the nose moved sideways), which aborts"
+            elif any("M=Confirmed authentication" in c for _, c in stamp_lines):
+                why = "face matched and the nod was confirmed, yet the stamp still failed; look at the raw lines"
+            elif any("Executing stamp" in c for _, c in stamp_lines):
+                why = "face matched, then NO nod was seen within the 5 s window (needs >= 8 px nose travel, two direction changes)"
+            else:
+                why = "face matched, then the nod stamp said no; no stamp details in the journal (verbose_stamps was off, or output went elsewhere)"
+        elif code == 14:
+            label, why = "no camera", "the PipeWire recorder could not start (target missing, pipewire not running, or GStreamer error)"
+        elif code == 12:
+            label, why = "no gi", "python GStreamer bindings missing"
+        else:
+            label, why = "error %d" % code, "compare.py exited with an unexpected code"
+    if label is None:
+        if msg.startswith("Child killed by signal"):
+            label, why = "crashed", "compare.py was killed by a signal (segfault?)"
+        else:
+            label, why = "?", "unrecognised pam_howdy message"
+    return label, why, stamp_lines
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("-n", type=int, default=1, help="number of most recent attempts to show")
+    ap.add_argument("--since", default="-24h", help="journalctl --since value (default -24h)")
+    ap.add_argument("--all", action="store_true", help="show every attempt in the window")
+    ap.add_argument("-v", "--verbose", action="store_true", help="also print the raw stamp lines")
+    args = ap.parse_args()
+
+    attempts, chatter = parse(journal(args.since))
+    if not attempts:
+        print("no Howdy attempts in the journal since %s" % args.since)
+        return
+    show = attempts if args.all else attempts[-args.n:]
+    for t, pid, msg in show:
+        label, why, stamp_lines = explain(t, msg, chatter)
+        print("%s  [%s]  %s" % (t.strftime("%Y-%m-%d %H:%M:%S"), label, why))
+        print("        pam_howdy[%d]: %s" % (pid, msg))
+        if args.verbose or label == "?":
+            for st, c in stamp_lines:
+                print("        %s  %s" % (st.strftime("%H:%M:%S"), c))
+    if not args.all and len(attempts) > len(show):
+        print("(%d attempts since %s; -n N or --all for more)" % (len(attempts), args.since))
+
+
+if __name__ == "__main__":
+    main()

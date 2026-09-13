@@ -19,3 +19,4 @@ dev         0644 /etc/systemd/system/cgpt-mark-successful.service
 unattended  0755 /etc/mkinitfs/hooks-extra/00-luks-autounlock.sh
 face_unlock 0644 /etc/pam.d/kde-fingerprint
 face_unlock 0755 ~/.local/bin/howdy-add-face.sh
+face_unlock 0755 ~/.local/bin/howdy-why
