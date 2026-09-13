@@ -1,0 +1,71 @@
+---
+# Unattended operation for remote kernel testing. INSECURE: anyone holding the
+# tablet gets a root shell and the disk contents. The on-device scripts
+# secure-mode-on / secure-mode-off do the same thing interactively.
+- name: sudo without password for {{ device_user }}
+  ansible.builtin.template:
+    src: sudoers.j2
+    dest: "/etc/sudoers.d/{{ device_user }}-nopasswd"
+    mode: "0440"
+    validate: visudo -c -f %s
+
+- name: Plasma lock screen off (no display manager; this is the login boundary)
+  ansible.builtin.lineinfile:
+    path: "{{ device_home }}/.config/kscreenlockerrc"
+    regexp: "^{{ item }}="
+    line: "{{ item }}=false"
+    insertafter: '^\[Daemon\]'
+    create: true
+    owner: "{{ device_user }}"
+    group: "{{ device_user }}"
+    mode: "0644"
+  loop: [Autolock, LockOnResume, LockOnStart]
+
+- name: kscreenlockerrc has a [Daemon] section
+  ansible.builtin.lineinfile:
+    path: "{{ device_home }}/.config/kscreenlockerrc"
+    line: "[Daemon]"
+    insertbefore: BOF
+
+- name: LUKS auto-unlock keyfile
+  when: unattended_luks | bool
+  block:
+    - name: Generate the keyfile
+      ansible.builtin.shell: umask 077 && head -c 64 /dev/urandom > /etc/luks-autounlock.key
+      args: { creates: /etc/luks-autounlock.key }
+
+    - name: Does the keyfile already open the root partition
+      ansible.builtin.command: cryptsetup open --test-passphrase --key-file /etc/luks-autounlock.key {{ luks_partition }}
+      register: luks_test
+      changed_when: false
+      failed_when: false
+      check_mode: false
+
+    - name: Passphrase is needed to add the key slot
+      ansible.builtin.assert:
+        that: luks_passphrase is defined
+        fail_msg: "Set -e luks_passphrase=... (or LUKS_PASSPHRASE for bootstrap.sh) to enrol the keyfile."
+      when: luks_test.rc != 0 and not ansible_check_mode
+
+    - name: Keyfile is not enrolled yet (dry run)
+      ansible.builtin.debug:
+        msg: "The keyfile does not open {{ luks_partition }} yet; a real run needs luks_passphrase."
+      when: luks_test.rc != 0 and ansible_check_mode
+
+    - name: Add the keyfile as a LUKS key slot
+      ansible.builtin.shell: printf %s "$PASS" | cryptsetup luksAddKey {{ luks_partition }} /etc/luks-autounlock.key
+      environment: { PASS: "{{ luks_passphrase | default('') }}" }
+      no_log: true
+      when: luks_test.rc != 0 and not ansible_check_mode
+      notify: rebuild initramfs
+
+    - name: Initramfs hook and file list
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/managed_files.yml"
+      vars: { role_name: unattended }
+
+    - name: Ship the keyfile in the initramfs
+      ansible.builtin.copy:
+        content: "/etc/luks-autounlock.key\n"
+        dest: /etc/mkinitfs/files-extra/00-luks-autounlock.files
+        mode: "0644"
+      notify: rebuild initramfs

@@ -1,0 +1,146 @@
+# Co-Maintainer: Ingo Reitz <9l@9lo.re>
+# Co-Maintainer: WeirdTreeThing <bradyn127@protonmail.com>
+maintainer="Alicja Michalska <ellyqw@mainlining.org>"
+pkgname=linux-postmarketos-qcom-sc7180
+pkgver=6.18.40
+pkgrel=1
+pkgdesc="Mainline kernel for Qualcomm Snapdragon 7c devices"
+arch="aarch64"
+_carch="arm64"
+_flavor="${pkgname#linux-}"
+url="https://kernel.org"
+license="GPL-2.0-only"
+options="!strip !check !tracedeps
+	pmb:cross-native
+	pmb:kconfigcheck-community
+	pmb:kconfigcheck-uefi
+"
+makedepends="
+	bison
+	clang
+	elfutils-dev
+	findutils
+	flex
+	linux-headers
+	lld
+	llvm
+	openssl-dev
+	pahole
+	perl
+	postmarketos-installkernel
+	xz
+	python3
+	zstd
+"
+
+# Source
+_config="config-$_flavor.$arch"
+case $pkgver in
+	*.*.*)	_kernver=${pkgver%.0};;
+	*.*)	_kernver=$pkgver;;
+esac
+source="
+	https://cdn.kernel.org/pub/linux/kernel/v${_kernver%%.*}.x/linux-${pkgver//_/-}.tar.xz
+	0001-drm-msm-adreno-a6xx-Mark-cxpd-device_link-as-statele.patch
+	0002-drm-msm-Centralize-the-standalone-drm-device-check-f.patch
+	0003-drm-msm-adreno-Fix-invalid-drvdata-typecast-in-adren.patch
+	0004-drm-msm-Always-use-component-model-for-standalone-GP.patch
+	0005-drm-msm-Attach-a-driver-to-the-GMU.patch
+	0006-dt-bindings-media-qcom-sc7180-camss-Add-SC7180-CAMSS.patch
+	0007-dt-bindings-i2c-qcom-cci-Document-SC7180-compatible.patch
+	0008-media-camss-csiphy-3ph-Add-Gen2-v1.2.2-two-phase-MIP.patch
+	0009-media-qcom-camss-Add-sc7180-support.patch
+	0010-media-qcom-camss-Add-sc7180-resources.patch
+	0011-media-qcom-camss-sc7180-Add-interconnect-support.patch
+	0012-media-qcom-camss-sc7180-Request-CSIPHY-vdda-phy-and-.patch
+	0013-clk-qcom-gcc-sc7180-Skip-halt-check-for-gcc_camera_h.patch
+	0014-media-i2c-ov8856-Report-the-active-media-bus-code-fr.patch
+	0015-media-i2c-ov8856-Implement-get_selection.patch
+	0016-media-i2c-ov8856-Don-t-power-off-an-already-suspende.patch
+	0017-media-i2c-ov8856-Register-the-orientation-and-rotati.patch
+	0018-dt-bindings-media-i2c-ovti-ov8856-Allow-video-interf.patch
+	0019-dt-bindings-media-i2c-ovti-ov5675-ovti-ov8856-Allow-.patch
+	0020-arm64-dts-qcom-sc7180-camss-Add-CAMSS-block-definiti.patch
+	0021-arm64-dts-qcom-sc7180-Add-CCI0-camera-control-interf.patch
+	0022-arm64-dts-qcom-sc7180-trogdor-wormdingler-Add-MIPI-c.patch
+	0023-i2c-qcom-cci-Remove-unused-CCI_RES_MAX-macro-definit.patch
+	0024-i2c-qcom-cci-Do-not-check-return-value-of-cci_init.patch
+	0025-i2c-qcom-cci-Move-cci_init-under-cci_reset-function.patch
+	0026-i2c-qcom-cci-Remove-overcautious-disable_irq-calls.patch
+	0027-i2c-qcom-cci-drop-custom-suspend-resume-and-rely-on-.patch
+	0028-i2c-qcom-cci-fix-autosuspend-cleanup.patch
+	$_config
+"
+builddir="$srcdir/linux-${_kernver//_/-}"
+
+prepare() {
+	default_prepare
+	cp "$srcdir/config-$_flavor.$CARCH" .config
+}
+
+build() {
+	unset LDFLAGS
+	make ARCH="$_carch" LLVM=1 \
+		KBUILD_BUILD_VERSION="$((pkgrel + 1 ))-postmarketOS"
+}
+
+package() {
+	if [ -e "$builddir/arch/$_carch/boot/vmlinuz.efi" ]; then
+		# ZBOOT EFI decompressor for EFI booting
+		install -Dm644 "$builddir/arch/$_carch/boot/vmlinuz.efi" \
+			"$pkgdir/boot/linux.efi"
+
+		# Old GZIP'd kernel image for boot.img/crOS compatibility
+		install -Dm644 "$builddir/arch/$_carch/boot/vmlinuz" \
+			"$pkgdir/boot/vmlinuz"
+	else
+		echo "WARNING: CONFIG_ZBOOT not enabled!"
+		install -Dm644 "$builddir/arch/$_carch/boot/Image.gz" \
+			"$pkgdir/boot/vmlinuz"
+	fi
+
+	make modules_install dtbs_install \
+		ARCH="$_carch" \
+		LLVM=1 \
+		INSTALL_PATH="$pkgdir"/boot \
+		INSTALL_MOD_PATH="$pkgdir"/usr \
+		INSTALL_MOD_STRIP=1 \
+		INSTALL_DTBS_PATH="$pkgdir/boot/dtbs"
+	rm -f "$pkgdir"/usr/lib/modules/*/build "$pkgdir"/usr/lib/modules/*/source
+
+	install -D "$builddir"/include/config/kernel.release \
+		"$pkgdir"/usr/share/kernel/$_flavor/kernel.release
+}
+
+sha512sums="
+c79b74b450c00c3da75da59bee5659687f06d3814ebc1c9e6304a89ec756c02caedcb6067897842ea2444c794dbfb83b2feaa6a22c463fe51323ce730554f9a1  linux-6.18.40.tar.xz
+9680cf56d05e629ea4740123e02dd0ea09045b0cacd3aa1ce4c6cd2b42e136011d81b9e4ee50394974a58392d3fc5e99d3c489877ce359e437fabbee8bee712e  0001-drm-msm-adreno-a6xx-Mark-cxpd-device_link-as-statele.patch
+4e2180cf50f75466b510435133f510fe1f06e4f828ce0aacd0588abc5d6db432d6257a8d6fcc88103c7ceb1f93eabc2d35f154201bef86f9a3aa65367edef694  0002-drm-msm-Centralize-the-standalone-drm-device-check-f.patch
+22a416eadfd30a5ffd1d065ce17d7b0bd2285d8ae902401147be8617f26d372f9400551d728769f37398462f0ba0b58cdc4443f44c1d1fb2591c3a9f88432387  0003-drm-msm-adreno-Fix-invalid-drvdata-typecast-in-adren.patch
+81f83455054502d04063178761d230e9300562241826f3a7e34605b9f7e6b95271ce060c80d4841f13731d69b076d46813f3ecd945e29b33672b836847a9096c  0004-drm-msm-Always-use-component-model-for-standalone-GP.patch
+74d6e28134809ecd74719dd1ee804b92ffd0a8528b555d7bcc44a59064d58010fdc1710938c0af5bbdf08e3dd3792a4fd538548dfa5192dcd35aa25df09364b5  0005-drm-msm-Attach-a-driver-to-the-GMU.patch
+3eba212b30908c01fcd6a2b55415e6c94240ce8ccecf48c57ff888666299f3213191072c4aa72f1c6e4486240d080c9901965bd71df0197257a604e164c43565  0006-dt-bindings-media-qcom-sc7180-camss-Add-SC7180-CAMSS.patch
+f464ec2557f7a4360190d81e1d9db7a22e5e49c2080b1a313b4c0abd055251ed0b44098639eff4fe1315219015e2ed1b0d94cc711fff96385d03fe9f7d67eb77  0007-dt-bindings-i2c-qcom-cci-Document-SC7180-compatible.patch
+9b64c2251dd504385cb94b1f8ecce6dd55dff26611f5dc51cbbeb830cea9074ea48cdfb2cad1641ef9c5da8fb0b59347b11508e1052f4eff26d7573e0b930c32  0008-media-camss-csiphy-3ph-Add-Gen2-v1.2.2-two-phase-MIP.patch
+b936ebd84b2a8fb57be55365c5360a1120b1c9841f570ec5df50d35554021de5ffa199aead8cf4d01f1306deb82063f97656232aeae3f265d3a70e69ba54c9c9  0009-media-qcom-camss-Add-sc7180-support.patch
+522c863f8fe8099f8c6fa5d259bb54a3cfda59d24790bbfe159a4130bf692c893d7a1def9527904b3d10f6423d4c480fb3635d686ae87bc3276b463965ed0f19  0010-media-qcom-camss-Add-sc7180-resources.patch
+0eaa2de32f71a8f124917eccd76ac7614c8e61bc85c1ef11038d84b1d3c021f4ba5a4b665b0cb5b9685d231a8ec3e7b359db6c46fae84b0e029427fa77a2aa82  0011-media-qcom-camss-sc7180-Add-interconnect-support.patch
+3b2187c07f0bc4683edd8d88bbbfea9ca5eb5b16ba06fce646d6f41a6db24f48ec8cdf96ff1da15cd82d0b9b0b7a8f1d75ddef197733b084a6b0bf74cbff7fc8  0012-media-qcom-camss-sc7180-Request-CSIPHY-vdda-phy-and-.patch
+39c5cb92804b94c46c922cd15f8243d8c0fe3dac988a0f7d364f4ac0d280d6cf7ebf894b1091d4ad930b396045e9b4738461a42ed9e3d0124b55fa88919332ce  0013-clk-qcom-gcc-sc7180-Skip-halt-check-for-gcc_camera_h.patch
+fa613bd760d8f3b38e5f286f5ee14a2a5a3082157bfff6796c994f12a3199483a02c758bb59a6c90498f4f05b0c2a860b77ccef8fe2cedf21be830bf36671cba  0014-media-i2c-ov8856-Report-the-active-media-bus-code-fr.patch
+d7e9f89f726854989612bb343ab6b0e0d781a59d859f84284a0ddea05528aa1316e07e0518a00e73642c0d11b5f163b42b653ca3aa6964720ce962805561c1ce  0015-media-i2c-ov8856-Implement-get_selection.patch
+c2cd4c17a314bbd0a730d9325a978a87ef174a79295c8ae9604f1b55b60867c7d4a28631c1126eb3bd1004a02f34228fa6c826e4828b25dc38af64541a4e8d8f  0016-media-i2c-ov8856-Don-t-power-off-an-already-suspende.patch
+2f4523903ab9fb86c10c0b785f498bb92bd8ef20dcd4b17725b1c38fc8ef509ee77f07ef8bd783e1db19b8a661097ba1b2538cf5ffda2e9f0c2af347cd629d4f  0017-media-i2c-ov8856-Register-the-orientation-and-rotati.patch
+1730d3df5f07c8f99dc5c8225679299357a4666854823fb1d7b0c320825be3fdd60cfe9e39d0e78f830abbdbedadb164b91d82823538363e160b7eea7453a902  0018-dt-bindings-media-i2c-ovti-ov8856-Allow-video-interf.patch
+a0f84e769461a20b076306c5e01f5e45aea6db89580ad41aad8ef987062167a1a8767b6208bf61a28740dea62824e52203247f61bc0d5aa5c97524ea3a897cae  0019-dt-bindings-media-i2c-ovti-ov5675-ovti-ov8856-Allow-.patch
+88b8f098a92bad43a947655a951f3d522caf9c08434be17be4838f8ef8987c1eddc10bb3de7bb035e1cd9b9eb90187bf2bda545206118ff958c263aa39f3c7a1  0020-arm64-dts-qcom-sc7180-camss-Add-CAMSS-block-definiti.patch
+77a3d59d643f4aa3f242f877511369b57a24c42d4af76012d3a86d0a1b75ebbabb6d7b3c368838da1aa3141e2096273981007ef634d15e24b61b139544b46e80  0021-arm64-dts-qcom-sc7180-Add-CCI0-camera-control-interf.patch
+63e5dbdf00f511bfc12810823f9db61dcddb0e49c6983f72a2961c826dca2fe4862762497e8f45a64674ebde15e7b3d87d92f219db83f0270aa959db27f61b95  0022-arm64-dts-qcom-sc7180-trogdor-wormdingler-Add-MIPI-c.patch
+4ad20375cf9265a3daa9f09269aa377d74d76a842a8888113f86b922639dc276dc462d73f842636779fbdd3b76f9ba860579f4377f3cd8eb376fd4fe7757e769  0023-i2c-qcom-cci-Remove-unused-CCI_RES_MAX-macro-definit.patch
+975293cab2b48aebd3696cfa61ba567d7922489d4f165894f81b09a8c78fcee403fba9e84d6b4db9f1ea97aa9a8df451f773570d4348989c3f2b33410a583b6c  0024-i2c-qcom-cci-Do-not-check-return-value-of-cci_init.patch
+23651bebcab0c8b28e37438bd3f74452dc7bf286962271addfe39966857ac1559e4e231f110cee65c698cfd0a17c4ff7f6768b5b8bb57ee2135418a6ca90bb1f  0025-i2c-qcom-cci-Move-cci_init-under-cci_reset-function.patch
+70e85af772472c0b75fa4513c5138ab26adedc5e65651918d91a244e01f5beb5dd12934b8f9a2eaf76481739650b4d3671950951a80ae2a764c53f5b1f506066  0026-i2c-qcom-cci-Remove-overcautious-disable_irq-calls.patch
+bd858efc675915d357779913ee9b32ce21aaeeb09e1e7769908b011f137641da49011ea7157a76a6687217fc1f49d4cd5ccbbe6cb6c8194bdcb30cdc113c5096  0027-i2c-qcom-cci-drop-custom-suspend-resume-and-rely-on-.patch
+9ce13443f4879cebd2b36220e76947f55f7dc587b99c83c083a156fdb4761467d4684c31268d51f429cd550fd1da56901057afe14ab18fb57aec781e9befa54a  0028-i2c-qcom-cci-fix-autosuspend-cleanup.patch
+408dead9924cb3eebaeb97f9e27e944556d28152efe4f80ccab77ff8e967231c600dc6664dfcc4fdd9e07d46cae5a54723efaf2438092b050ad161675c767b8d  config-postmarketos-qcom-sc7180.aarch64
+"

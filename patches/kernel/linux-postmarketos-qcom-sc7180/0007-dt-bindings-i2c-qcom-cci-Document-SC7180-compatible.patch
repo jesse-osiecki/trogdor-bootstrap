@@ -1,0 +1,31 @@
+From 10401d26de459f1f0a3a5eae962fa8c4bfca2a8c Mon Sep 17 00:00:00 2001
+From: Jesse <jesse@jjo.ninja>
+Date: Thu, 3 Sep 2026 00:33:26 -0400
+Subject: [PATCH 07/28] dt-bindings: i2c: qcom-cci: Document SC7180 compatible
+
+SC7180 CCI is a CCI v2 block with the same clock list as SDM845.
+Signed-off-by: Jesse <jesse@jjo.ninja>
+---
+ Documentation/devicetree/bindings/i2c/qcom,i2c-cci.yaml | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/i2c/qcom,i2c-cci.yaml b/Documentation/devicetree/bindings/i2c/qcom,i2c-cci.yaml
+index 9bc99d736..0cba00222 100644
+--- a/Documentation/devicetree/bindings/i2c/qcom,i2c-cci.yaml
++++ b/Documentation/devicetree/bindings/i2c/qcom,i2c-cci.yaml
+@@ -27,6 +27,7 @@ properties:
+           - enum:
+               - qcom,qcm2290-cci
+               - qcom,sa8775p-cci
++              - qcom,sc7180-cci
+               - qcom,sc7280-cci
+               - qcom,sc8280xp-cci
+               - qcom,sdm670-cci
+@@ -183,6 +184,7 @@ allOf:
+         compatible:
+           contains:
+             enum:
++              - qcom,sc7180-cci
+               - qcom,sdm845-cci
+               - qcom,sm6350-cci
+     then:

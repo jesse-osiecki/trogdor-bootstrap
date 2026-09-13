@@ -1,0 +1,13 @@
+---
+# Managed files in the base role: sysctl drop-in (needs sysctl --system) and the
+# accelerometer mount matrix rule (needs udev to re-read the rule and
+# iio-sensor-proxy to re-read the udev property).
+- name: base files changed
+  ansible.builtin.shell: >
+    sysctl --system
+    && udevadm control --reload && udevadm trigger --subsystem-match=iio
+    && systemctl try-restart iio-sensor-proxy
+  changed_when: true
+
+- name: reload keyd
+  ansible.builtin.command: keyd reload

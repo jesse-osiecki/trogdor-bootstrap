@@ -1,0 +1,35 @@
+From 499cac48e6652e6bf7ce5f5f283a569a4dfddabc Mon Sep 17 00:00:00 2001
+From: Jesse <jesse@jjo.ninja>
+Date: Thu, 3 Sep 2026 08:46:21 -0400
+Subject: [PATCH 13/28] clk: qcom: gcc-sc7180: Skip halt check for
+ gcc_camera_hf_axi_clk
+
+When the CAMSS driver releases the camera AXI clock after streaming,
+the branch never reports halted:
+
+  gcc_camera_hf_axi_clk status stuck at 'on'
+  WARNING: CPU: 2 PID: 2010 at drivers/clk/qcom/clk-branch.c:88 clk_branch_toggle+0x144/0x194
+  ...
+  camss_disable_clocks+0x40/0x70 [qcom_camss]
+  vfe_put+0x9c/0x104 [qcom_camss]
+
+The same clock on sc7280 already uses BRANCH_HALT_SKIP; do the same
+here.
+Signed-off-by: Jesse <jesse@jjo.ninja>
+---
+ drivers/clk/qcom/gcc-sc7180.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/qcom/gcc-sc7180.c b/drivers/clk/qcom/gcc-sc7180.c
+index 4a49ad7a9..beafdbc6c 100644
+--- a/drivers/clk/qcom/gcc-sc7180.c
++++ b/drivers/clk/qcom/gcc-sc7180.c
+@@ -878,7 +878,7 @@ static struct clk_branch gcc_boot_rom_ahb_clk = {
+ 
+ static struct clk_branch gcc_camera_hf_axi_clk = {
+ 	.halt_reg = 0xb020,
+-	.halt_check = BRANCH_HALT,
++	.halt_check = BRANCH_HALT_SKIP,
+ 	.clkr = {
+ 		.enable_reg = 0xb020,
+ 		.enable_mask = BIT(0),

@@ -1,0 +1,26 @@
+diff --git a/lib/TerminalDisplay.cpp b/lib/TerminalDisplay.cpp
+index b9768bf..0e8ea35 100644
+--- a/lib/TerminalDisplay.cpp
++++ b/lib/TerminalDisplay.cpp
+@@ -1660,7 +1660,20 @@ void TerminalDisplay::scrollToEnd()
+     connect(_scrollBar, &QAbstractSlider::valueChanged, this, &TerminalDisplay::scrollBarPositionChanged);
+ 
+     _screenWindow->scrollTo(_scrollBar->value() + 1);
+-    _screenWindow->setTrackOutput(_screenWindow->atEndOfOutput());
++
++    // Scrolling to the end is an explicit request to jump to the live screen
++    // and keep following it, so enable output tracking unconditionally.
++    //
++    // Deriving it from atEndOfOutput() instead is unreliable here: at startup
++    // scrollToEnd() runs while the item is still one line tall, so the screen
++    // window's line count (_lines) and the emulation's line count disagree.
++    // scrollTo() then clamps against the stale window size and atEndOfOutput()
++    // reports false, which switches tracking off. Nothing ever switches it back
++    // on, so the view stays pinned to the top of the scrollback while the live
++    // screen sits below the viewport: new output and any cursor-addressed
++    // redraw (i.e. every full-screen TUI) becomes invisible or lands as stale
++    // garbage on screen.
++    _screenWindow->setTrackOutput(true);
+ }
+ 
+ void TerminalDisplay::setScrollBarPosition(QTermWidget::ScrollBarPosition position)

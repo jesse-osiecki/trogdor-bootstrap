@@ -1,0 +1,11 @@
+[Unit]
+Description=Dead-man switch for unproven test kernels (run kernel-keep to confirm)
+After=multi-user.target
+ConditionKernelCommandLine=kern_guid
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/kernel-deadman
+
+[Install]
+WantedBy=multi-user.target

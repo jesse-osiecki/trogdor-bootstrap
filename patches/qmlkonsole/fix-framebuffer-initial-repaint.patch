@@ -1,0 +1,104 @@
+From 6489fa3c0dce81b412193bf7965d06ec8c3a5ddf Mon Sep 17 00:00:00 2001
+From: Jesse <jesse@jjo.ninja>
+Date: Thu, 10 Sep 2026 19:01:27 -0400
+Subject: [PATCH] Paint the whole item once after the render target is
+ allocated
+
+TerminalDisplay renders into a framebuffer object, whose contents are
+undefined when it is allocated, and sets a transparent fill colour, so Qt
+does not clear it. drawContents() paints the background only inside the
+painter's clip -- that is, inside the update region -- so any pixel that
+no update region has ever covered goes on displaying that undefined GPU
+memory for the lifetime of the window.
+
+In practice this leaves patches of uninitialised colour in the margins
+around the character grid, which no amount of terminal output clears
+because nothing ever marks them dirty. Resizing the window is the only
+thing that repaints them, since that forces a full repaint.
+
+Track when the render target may have been (re)allocated -- at
+construction, on resize, and when the item moves to another scene -- and
+make the next update() cover the whole item. Partial updates remain
+correct from then on, so the cost is one full repaint per allocation
+rather than one per frame.
+---
+ lib/TerminalDisplay.cpp | 27 +++++++++++++++++++++++++++
+ lib/TerminalDisplay.h   |  3 +++
+ 2 files changed, 30 insertions(+)
+
+diff --git a/lib/TerminalDisplay.cpp b/lib/TerminalDisplay.cpp
+index 2f03531..34db8a1 100644
+--- a/lib/TerminalDisplay.cpp
++++ b/lib/TerminalDisplay.cpp
+@@ -270,6 +270,7 @@ TerminalDisplay::TerminalDisplay(QQuickItem *parent)
+     , _contentWidth(1)
+     , _randomSeed(0)
+     , _resizing(false)
++    , _fullRepaintPending(true)
+     , _terminalSizeHint(false)
+     , _terminalSizeStartup(true)
+     , _bidiEnabled(false)
+@@ -2896,6 +2897,9 @@ void TerminalDisplay::geometryChange(const QRectF &newGeometry, const QRectF &ol
+ #endif
+ {
+     if (newGeometry != oldGeometry) {
++        // A resize reallocates the render target, so its contents are undefined
++        // again and the next repaint has to cover the whole item.
++        _fullRepaintPending = true;
+         resizeEvent(nullptr);
+         update();
+     }
+@@ -2910,6 +2914,24 @@ void TerminalDisplay::geometryChange(const QRectF &newGeometry, const QRectF &ol
+ void TerminalDisplay::update(const QRegion &region)
+ {
+     Q_UNUSED(region);
++
++    // The framebuffer object this item renders into (see setRenderTarget() in
++    // the constructor) holds undefined memory when it is allocated, and the
++    // fill colour is transparent, so Qt never clears it for us. drawContents()
++    // paints the background only inside the painter's clip, i.e. inside the
++    // update region, so a pixel that no update region has ever covered keeps
++    // showing whatever was in that GPU memory, for the lifetime of the window.
++    //
++    // Paint the whole item once to establish a known state. Partial updates are
++    // correct from then on, so this costs one extra full repaint per allocation
++    // of the framebuffer rather than one per frame.
++    if (_fullRepaintPending) {
++        _fullRepaintPending = false;
++        QQuickPaintedItem::update(contentsRect());
++        Q_EMIT imagePainted();
++        return;
++    }
++
+     // TODO this function might be optimized
+     //        const rects = region.rects();
+     //        for (QRect rect : rects) {
+@@ -3122,6 +3144,11 @@ void TerminalDisplay::itemChange(ItemChange change, const ItemChangeData &value)
+             }
+         }
+         break;
++    case QQuickItem::ItemSceneChange:
++        // Moving to another window means a new scene graph and a new render
++        // target, whose contents are undefined until we paint all of it.
++        _fullRepaintPending = true;
++        break;
+     default:
+         break;
+     }
+diff --git a/lib/TerminalDisplay.h b/lib/TerminalDisplay.h
+index 8448d9c..07257ba 100644
+--- a/lib/TerminalDisplay.h
++++ b/lib/TerminalDisplay.h
+@@ -890,6 +890,9 @@ private:
+     uint _randomSeed;
+ 
+     bool _resizing;
++    // Set whenever the render target may have been (re)allocated, so that the
++    // next update() repaints the whole item instead of only the dirty region.
++    bool _fullRepaintPending;
+     bool _terminalSizeHint;
+     bool _terminalSizeStartup;
+     bool _bidiEnabled;
+-- 
+2.54.0
+

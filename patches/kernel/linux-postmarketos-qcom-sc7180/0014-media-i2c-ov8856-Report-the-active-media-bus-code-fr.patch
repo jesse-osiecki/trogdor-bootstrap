@@ -1,0 +1,44 @@
+From a4fabce947b3232f35b2553f0b3a5be379d15341 Mon Sep 17 00:00:00 2001
+From: Jesse <jesse@jjo.ninja>
+Date: Thu, 3 Sep 2026 08:49:35 -0400
+Subject: [PATCH 14/28] media: i2c: ov8856: Report the active media bus code
+ from get_fmt
+
+ov8856_get_format() calls ov8856_update_pad_format() with whatever
+code the caller left in fmt->format.code. For an unknown (typically
+zero) code that helper falls back to the mode's default code and, as a
+side effect, overwrites cur_mbus_index. With the sensor configured for
+SBGGR10 on a mode whose default is SGRBG10, link validation reads the
+pad format with a zeroed struct, gets SGRBG10 back and fails with
+-EPIPE:
+
+  v4l2_subdev_link_validate_default: media bus code does not match (source 0x0000300a, sink 0x00003007)
+  link was "ov8856 15-0010":0 -> "msm_csiphy1":0
+
+Seed the code from cur_mbus_index so get_fmt is idempotent and returns
+the format that was actually set.
+Signed-off-by: Jesse <jesse@jjo.ninja>
+---
+ drivers/media/i2c/ov8856.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/media/i2c/ov8856.c b/drivers/media/i2c/ov8856.c
+index dd01e1d51..eb1251d7c 100644
+--- a/drivers/media/i2c/ov8856.c
++++ b/drivers/media/i2c/ov8856.c
+@@ -2173,11 +2173,13 @@ static int ov8856_get_format(struct v4l2_subdev *sd,
+ 	struct ov8856 *ov8856 = to_ov8856(sd);
+ 
+ 	mutex_lock(&ov8856->mutex);
+-	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY)
++	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY) {
+ 		fmt->format = *v4l2_subdev_state_get_format(sd_state,
+ 							    fmt->pad);
+-	else
++	} else {
++		fmt->format.code = ov8856_mbus_codes[ov8856->cur_mbus_index];
+ 		ov8856_update_pad_format(ov8856, ov8856->cur_mode, &fmt->format);
++	}
+ 
+ 	mutex_unlock(&ov8856->mutex);
+ 

@@ -1,0 +1,56 @@
+From 90aeb167fd5f0aefe31c9c2beac9ca41e1bd207f Mon Sep 17 00:00:00 2001
+From: Jesse <jesse@jjo.ninja>
+Date: Thu, 10 Sep 2026 19:01:00 -0400
+Subject: [PATCH] Do not truncate the item size when computing contentsRect()
+
+QQuickItem::width() and height() are qreal, and under a fractional
+devicePixelRatio they are routinely fractional themselves. Building a
+QRect straight from them truncates, so contentsRect() comes back a pixel
+short in each direction and excludes the item's last row and column.
+
+contentsRect() is both the rect update() marks dirty for a full repaint
+and the rect drawContents() fills with the background colour, so those
+excluded pixels are never painted by anything. Since the item renders
+into a framebuffer object -- whose contents are undefined when it is
+allocated -- and the fill colour is transparent, so Qt does not clear it
+either, that edge strip keeps displaying whatever happened to be in that
+GPU memory for as long as the window lives.
+
+On a 1200x2000 panel at scale 1.25 this shows up as a band of
+uninitialised colour along the edge of the terminal that no amount of
+output clears, and that only disappears if the window is resized.
+
+Round the rect outward instead so it always covers the whole item.
+---
+ lib/TerminalDisplay.cpp | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/lib/TerminalDisplay.cpp b/lib/TerminalDisplay.cpp
+index b9768bf..2f03531 100644
+--- a/lib/TerminalDisplay.cpp
++++ b/lib/TerminalDisplay.cpp
+@@ -2927,7 +2927,20 @@ void TerminalDisplay::update()
+ 
+ QRect TerminalDisplay::contentsRect() const
+ {
+-    return QRect(0, 0, this->width(), this->height());
++    // width() and height() are qreal and are routinely fractional under a
++    // fractional devicePixelRatio, so constructing a QRect from them directly
++    // truncates and drops the last row and column of the item.
++    //
++    // That matters more than it looks: this rect is what update() marks dirty
++    // and what drawContents() fills with the background colour, so a truncated
++    // rect leaves an edge strip that nothing ever paints. The item renders into
++    // a framebuffer object whose contents are undefined when it is allocated
++    // (see setRenderTarget() in the constructor) and the fill colour is
++    // transparent, so Qt does not clear it either -- the strip keeps showing
++    // whatever was in that GPU memory for the lifetime of the window.
++    //
++    // Round outward so the rect always covers the whole item.
++    return QRectF(0, 0, width(), height()).toAlignedRect();
+ }
+ 
+ QSize TerminalDisplay::size() const
+-- 
+2.54.0
+

@@ -1,0 +1,35 @@
+From f36cbda8319cee39274f3f833bca37393d24457f Mon Sep 17 00:00:00 2001
+From: Jesse <jesse@jjo.ninja>
+Date: Thu, 3 Sep 2026 08:55:17 -0400
+Subject: [PATCH 16/28] media: i2c: ov8856: Don't power off an already
+ suspended sensor on remove
+
+ov8856_remove() unconditionally calls ov8856_power_off() even when the
+device is runtime suspended and thus already powered down, which trips
+the regulator core:
+
+  WARNING: CPU: 1 PID: 7583 at drivers/regulator/core.c:3025 _regulator_disable+0x6c/0x2b0
+  ov8856_remove+0x64/0x90 [ov8856]
+
+Only power off when the device is still active, and mark it suspended
+afterwards.
+Signed-off-by: Jesse <jesse@jjo.ninja>
+---
+ drivers/media/i2c/ov8856.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/media/i2c/ov8856.c b/drivers/media/i2c/ov8856.c
+index 26f4bc9e2..e43d2c270 100644
+--- a/drivers/media/i2c/ov8856.c
++++ b/drivers/media/i2c/ov8856.c
+@@ -2401,7 +2401,9 @@ static void ov8856_remove(struct i2c_client *client)
+ 	pm_runtime_disable(ov8856->dev);
+ 	mutex_destroy(&ov8856->mutex);
+ 
+-	ov8856_power_off(ov8856->dev);
++	if (!pm_runtime_status_suspended(ov8856->dev))
++		ov8856_power_off(ov8856->dev);
++	pm_runtime_set_suspended(ov8856->dev);
+ }
+ 
+ static int ov8856_probe(struct i2c_client *client)

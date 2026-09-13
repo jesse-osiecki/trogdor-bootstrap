@@ -1,0 +1,45 @@
+From c62fe566478aef3de46bffdc0e28aef18b932c96 Mon Sep 17 00:00:00 2001
+From: Jesse <jesse@jjo.ninja>
+Date: Thu, 3 Sep 2026 18:01:35 -0400
+Subject: [PATCH 17/28] media: i2c: ov8856: Register the orientation and
+ rotation controls
+
+Parse the fwnode "orientation" and "rotation" properties and expose
+them as V4L2_CID_CAMERA_ORIENTATION and V4L2_CID_CAMERA_SENSOR_ROTATION
+like most other sensor drivers do. libcamera uses them to tell the user
+which camera is the front or back one; without them the OV8856 on the
+Lenovo IdeaPad Duet 3 shows up as a nameless sensor and applications
+cannot pick the front camera by default.
+Signed-off-by: Jesse <jesse@jjo.ninja>
+---
+ drivers/media/i2c/ov8856.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/drivers/media/i2c/ov8856.c b/drivers/media/i2c/ov8856.c
+index e43d2c270..e2ed4bc2e 100644
+--- a/drivers/media/i2c/ov8856.c
++++ b/drivers/media/i2c/ov8856.c
+@@ -1895,6 +1895,7 @@ static const struct v4l2_ctrl_ops ov8856_ctrl_ops = {
+ 
+ static int ov8856_init_controls(struct ov8856 *ov8856)
+ {
++	struct v4l2_fwnode_device_properties props;
+ 	struct v4l2_ctrl_handler *ctrl_hdlr;
+ 	s64 exposure_max, h_blank;
+ 	int ret;
+@@ -1964,6 +1965,15 @@ static int ov8856_init_controls(struct ov8856 *ov8856)
+ 		goto err_ctrl_handler_free;
+ 	}
+ 
++	ret = v4l2_fwnode_device_parse(ov8856->dev, &props);
++	if (ret)
++		return ret;
++
++	ret = v4l2_ctrl_new_fwnode_properties(ctrl_hdlr, &ov8856_ctrl_ops,
++					      &props);
++	if (ret)
++		return ret;
++
+ 	ov8856->sd.ctrl_handler = ctrl_hdlr;
+ 
+ 	return 0;

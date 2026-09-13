@@ -1,0 +1,13 @@
+[Unit]
+Description=Copy dmesg to /boot every 0.5 s (test kernels only)
+ConditionKernelVersion=>=7.0
+DefaultDependencies=no
+RequiresMountsFor=/boot
+After=local-fs.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/dmesg-live
+
+[Install]
+WantedBy=sysinit.target

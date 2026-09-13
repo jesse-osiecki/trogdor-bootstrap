@@ -1,0 +1,10 @@
+---
+- name: unattended files changed
+  ansible.builtin.command: /bin/true
+  changed_when: false
+  notify: rebuild initramfs
+
+# Also runs boot-deploy, which rewrites the pmOS_kernel slot (p1) with the
+# installed package kernel.
+- name: rebuild initramfs
+  ansible.builtin.command: mkinitfs

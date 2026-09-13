@@ -1,0 +1,13 @@
+---
+# trogdor-bootstrap: reproduce the jesse-tab setup on a google-trogdor device.
+# Run through ./bootstrap.sh (installs ansible on first use). base always runs;
+# the others are switched on per device in host_vars or with -e enable_x=true,
+# and can be selected with --tags base,dev,unattended,face_unlock.
+- name: Bootstrap a trogdor device
+  hosts: all
+  become: true
+  roles:
+    - { role: base,        tags: [base] }
+    - { role: dev,         tags: [dev],         when: enable_dev | bool }
+    - { role: unattended,  tags: [unattended],  when: enable_unattended | bool }
+    - { role: face_unlock, tags: [face_unlock], when: enable_face_unlock | bool }

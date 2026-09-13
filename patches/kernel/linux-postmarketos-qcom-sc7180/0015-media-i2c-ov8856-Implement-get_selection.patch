@@ -1,0 +1,75 @@
+From c4e2b8165fb92ab6901a288950a00cd72c1760c3 Mon Sep 17 00:00:00 2001
+From: Jesse <jesse@jjo.ninja>
+Date: Thu, 3 Sep 2026 08:49:36 -0400
+Subject: [PATCH 15/28] media: i2c: ov8856: Implement get_selection
+
+libcamera requires V4L2_SEL_TGT_CROP_BOUNDS/CROP_DEFAULT/CROP and
+NATIVE_SIZE on the sensor pad to derive the pixel array properties and
+otherwise warns that the driver needs fixing. Report the 3296x2480
+pixel array with the 3280x2464 active area, like ov5675 does.
+Signed-off-by: Jesse <jesse@jjo.ninja>
+---
+ drivers/media/i2c/ov8856.c | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+
+diff --git a/drivers/media/i2c/ov8856.c b/drivers/media/i2c/ov8856.c
+index eb1251d7c..26f4bc9e2 100644
+--- a/drivers/media/i2c/ov8856.c
++++ b/drivers/media/i2c/ov8856.c
+@@ -20,6 +20,14 @@
+ #define OV8856_REG_VALUE_24BIT		3
+ 
+ #define OV8856_SCLK			144000000ULL
++/* Pixel array: 3296x2480 total, 3280x2464 active */
++#define OV8856_NATIVE_WIDTH		3296
++#define OV8856_NATIVE_HEIGHT		2480
++#define OV8856_ACTIVE_START_LEFT	8
++#define OV8856_ACTIVE_START_TOP		8
++#define OV8856_ACTIVE_WIDTH		3280
++#define OV8856_ACTIVE_HEIGHT		2464
++
+ #define OV8856_XVCLK_19_2		19200000
+ #define OV8856_DATA_LANES		4
+ #define OV8856_RGB_DEPTH		10
+@@ -2186,6 +2194,33 @@ static int ov8856_get_format(struct v4l2_subdev *sd,
+ 	return 0;
+ }
+ 
++static int ov8856_get_selection(struct v4l2_subdev *sd,
++				struct v4l2_subdev_state *state,
++				struct v4l2_subdev_selection *sel)
++{
++	if (sel->which != V4L2_SUBDEV_FORMAT_ACTIVE)
++		return -EINVAL;
++
++	switch (sel->target) {
++	case V4L2_SEL_TGT_NATIVE_SIZE:
++		sel->r.top = 0;
++		sel->r.left = 0;
++		sel->r.width = OV8856_NATIVE_WIDTH;
++		sel->r.height = OV8856_NATIVE_HEIGHT;
++		return 0;
++	case V4L2_SEL_TGT_CROP:
++	case V4L2_SEL_TGT_CROP_DEFAULT:
++	case V4L2_SEL_TGT_CROP_BOUNDS:
++		sel->r.top = OV8856_ACTIVE_START_TOP;
++		sel->r.left = OV8856_ACTIVE_START_LEFT;
++		sel->r.width = OV8856_ACTIVE_WIDTH;
++		sel->r.height = OV8856_ACTIVE_HEIGHT;
++		return 0;
++	}
++
++	return -EINVAL;
++}
++
+ static int ov8856_enum_mbus_code(struct v4l2_subdev *sd,
+ 				 struct v4l2_subdev_state *sd_state,
+ 				 struct v4l2_subdev_mbus_code_enum *code)
+@@ -2241,6 +2276,7 @@ static const struct v4l2_subdev_video_ops ov8856_video_ops = {
+ static const struct v4l2_subdev_pad_ops ov8856_pad_ops = {
+ 	.set_fmt = ov8856_set_format,
+ 	.get_fmt = ov8856_get_format,
++	.get_selection = ov8856_get_selection,
+ 	.enum_mbus_code = ov8856_enum_mbus_code,
+ 	.enum_frame_size = ov8856_enum_frame_size,
+ };

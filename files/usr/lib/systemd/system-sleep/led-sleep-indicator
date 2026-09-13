@@ -1,0 +1,27 @@
+#!/bin/sh
+# systemd system-sleep hook: light the Chromebook charging LED green while the
+# device is suspended, and hand control back to the EC on resume.
+#
+# Sleep is "deep" on this machine (see /sys/power/mem_sleep), so kernel-side
+# blink/pattern triggers stop as soon as the SoC sleeps. A static colour is the
+# only thing that survives, and green is a colour the EC never uses on its own
+# (it uses red/amber for charging), so green == asleep.
+#
+# Called by systemd with "pre"/"post" and the sleep type (suspend, hibernate...).
+
+LED=/sys/class/leds/chromeos:multicolor:charging
+
+[ -d "$LED" ] || exit 0
+
+case "$1" in
+    pre)
+        echo none > "$LED/trigger"
+        # channels: red green amber
+        echo "0 100 0" > "$LED/multi_intensity"
+        echo 1 > "$LED/brightness"
+        ;;
+    post)
+        echo chromeos-auto > "$LED/trigger"
+        ;;
+esac
+exit 0

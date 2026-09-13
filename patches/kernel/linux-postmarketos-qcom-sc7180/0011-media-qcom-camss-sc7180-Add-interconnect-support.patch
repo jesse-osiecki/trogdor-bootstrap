@@ -1,0 +1,62 @@
+From b2b86508b7d68ecef1321d5c07c43eaa074eb4db Mon Sep 17 00:00:00 2001
+From: Jesse <jesse@jjo.ninja>
+Date: Thu, 3 Sep 2026 19:01:52 -0400
+Subject: [PATCH 11/28] media: qcom: camss: sc7180: Add interconnect support
+
+Describe the CAMSS interconnect paths for sc7180 (config AHB path plus
+the HF0/HF1/SF CAMNOC paths) and vote for bandwidth on them like the
+sdm845 and sm8250 resources do, so the camera NoC is actually clocked
+when the VFE writes frames to memory.
+
+Based on a patch by map220v carried on the 99degree/linux "camss"
+branch; rewritten and resubmitted with permission to be sought from the
+original author.
+
+Signed-off-by: Jesse <jesse@jjo.ninja>
+---
+ drivers/media/platform/qcom/camss/camss.c | 25 +++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+
+diff --git a/drivers/media/platform/qcom/camss/camss.c b/drivers/media/platform/qcom/camss/camss.c
+index 3eac02d26..f8344fd3e 100644
+--- a/drivers/media/platform/qcom/camss/camss.c
++++ b/drivers/media/platform/qcom/camss/camss.c
+@@ -1566,6 +1566,29 @@ static const struct camss_subdev_resources vfe_res_7180[] = {
+ 	}
+ };
+ 
++static const struct resources_icc icc_res_7180[] = {
++	{
++		.name = "cam_ahb",
++		.icc_bw_tbl.avg = 125000,
++		.icc_bw_tbl.peak = 250000,
++	},
++	{
++		.name = "cam_hf_0_camnoc",
++		.icc_bw_tbl.avg = 2097152,
++		.icc_bw_tbl.peak = 2097152,
++	},
++	{
++		.name = "cam_hf_1_camnoc",
++		.icc_bw_tbl.avg = 2097152,
++		.icc_bw_tbl.peak = 2097152,
++	},
++	{
++		.name = "cam_sf_camnoc",
++		.icc_bw_tbl.avg = 2097152,
++		.icc_bw_tbl.peak = 2097152,
++	},
++};
++
+ static const struct camss_subdev_resources csiphy_res_8250[] = {
+ 	/* CSIPHY0 */
+ 	{
+@@ -4650,6 +4673,8 @@ static const struct camss_resources sc7180_resources = {
+ 	.csiphy_res = csiphy_res_7180,
+ 	.csid_res = csid_res_7180,
+ 	.vfe_res = vfe_res_7180,
++	.icc_res = icc_res_7180,
++	.icc_path_num = ARRAY_SIZE(icc_res_7180),
+ 	.csiphy_num = ARRAY_SIZE(csiphy_res_7180),
+ 	.csid_num = ARRAY_SIZE(csid_res_7180),
+ 	.vfe_num = ARRAY_SIZE(vfe_res_7180),

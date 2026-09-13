@@ -1,0 +1,19 @@
+#!/bin/sh
+# Confirm the running test kernel: stops the dead-man switch and blesses the
+# booted slot (successful=1, tries=0, priority 15 for pmOS_kernel_b).
+set -eu
+for x in $(cat /proc/cmdline); do
+	case "$x" in kern_guid=*) guid="${x#kern_guid=}";; esac
+done
+[ -n "${guid:-}" ] || { echo "no kern_guid on the command line"; exit 1; }
+part=$(findfs PARTUUID="$guid")
+disk=$(echo "$part" | sed 's/p[0-9]*$//')
+num=$(echo "$part" | sed 's/.*p//')
+echo "$(date '+%F %T') $(logname 2>/dev/null || echo "${SUDO_USER:-$USER}")" > /run/kernel-keep
+label=$(cgpt show -i "$num" -l "$disk")
+if [ "$label" = pmOS_kernel_b ]; then
+	cgpt add -i "$num" -P 15 -S 1 -T 0 "$disk"
+else
+	cgpt add -i "$num" -S 1 -T 0 "$disk"
+fi
+echo "kept $(uname -r) on $part ($label): $(cgpt show -i "$num" "$disk" | grep Attr | sed 's/^ *//')"

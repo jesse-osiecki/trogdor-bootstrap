@@ -1,0 +1,173 @@
+From 40911ce36f640f1c0b3f56d994a89f6b2b718037 Mon Sep 17 00:00:00 2001
+From: Jesse <jesse@jjo.ninja>
+Date: Thu, 3 Sep 2026 00:28:41 -0400
+Subject: [PATCH 22/28] arm64: dts: qcom: sc7180-trogdor-wormdingler: Add MIPI
+ cameras
+
+Wormdingler (Lenovo IdeaPad Duet 3 Chromebook) has a 5 MP fixed focus
+user-facing camera on CSIPHY0/CCI0 master 0 and an 8 MP autofocus
+world-facing camera on CSIPHY1/CCI0 master 1. Wiring (MCLK0 on gpio13,
+MCLK1 on gpio14, resets on gpio30/gpio29, camera EEPROMs at 0x50/0x58)
+comes from the ChromeOS 5.4 device tree. Sensor part numbers are not
+documented there; ov5675/ov8856 are the initial guess and will be
+corrected after probing.
+Signed-off-by: Jesse <jesse@jjo.ninja>
+---
+ .../dts/qcom/sc7180-trogdor-wormdingler.dtsi  | 147 ++++++++++++++++++
+ 1 file changed, 147 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/qcom/sc7180-trogdor-wormdingler.dtsi b/arch/arm64/boot/dts/qcom/sc7180-trogdor-wormdingler.dtsi
+index 607830869..6e31cfbbc 100644
+--- a/arch/arm64/boot/dts/qcom/sc7180-trogdor-wormdingler.dtsi
++++ b/arch/arm64/boot/dts/qcom/sc7180-trogdor-wormdingler.dtsi
+@@ -369,3 +369,150 @@ vdd_reset_1800: vdd-reset-1800-state {
+ 		bias-disable;
+ 	};
+ };
++
++/* CAMERAS */
++
++&camss {
++	vdda-phy-supply = <&vdda_mipi_csi0_0p9>;
++	vdda-pll-supply = <&vdda_csi0_1p25>;
++
++	status = "okay";
++
++	ports {
++		port@0 {
++			csiphy0_ep: endpoint {
++				clock-lanes = <7>;
++				data-lanes = <0 1>;
++				remote-endpoint = <&uf_cam_ep>;
++			};
++		};
++
++		port@1 {
++			csiphy1_ep: endpoint {
++				clock-lanes = <7>;
++				data-lanes = <0 1 2 3>;
++				remote-endpoint = <&wf_cam_ep>;
++			};
++		};
++	};
++};
++
++&cci {
++	status = "okay";
++};
++
++/* User-facing (front) camera, 5 MP fixed focus */
++&cci_i2c0 {
++	uf_cam: camera@36 {
++		compatible = "ovti,ov5675";
++		reg = <0x36>;
++
++		power-domains = <&camcc TITAN_TOP_GDSC>;
++		clocks = <&camcc CAM_CC_MCLK0_CLK>;
++		assigned-clocks = <&camcc CAM_CC_MCLK0_CLK>;
++		assigned-clock-rates = <19200000>;
++
++		reset-gpios = <&tlmm 30 GPIO_ACTIVE_LOW>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&cam_mclk0_default>, <&uf_cam_rst>;
++
++		avdd-supply = <&pp2800_uf_cam>;
++		dovdd-supply = <&pp1800_uf_cam>;
++		dvdd-supply = <&pp1800_uf_cam>;
++
++		orientation = <0>;
++		rotation = <0>;
++
++		port {
++			uf_cam_ep: endpoint {
++				data-lanes = <1 2>;
++				link-frequencies = /bits/ 64 <450000000>;
++				remote-endpoint = <&csiphy0_ep>;
++			};
++		};
++	};
++
++	uf_cam_eeprom: eeprom@50 {
++		compatible = "atmel,24c64";
++		reg = <0x50>;
++		vcc-supply = <&pp1800_uf_cam>;
++		read-only;
++	};
++};
++
++/* World-facing (rear) camera, 8 MP autofocus */
++&cci_i2c1 {
++	wf_cam: camera@10 {
++		compatible = "ovti,ov8856";
++		reg = <0x10>;
++
++		power-domains = <&camcc TITAN_TOP_GDSC>;
++		clocks = <&camcc CAM_CC_MCLK1_CLK>;
++		clock-names = "xvclk";
++		clock-frequency = <19200000>;
++		assigned-clocks = <&camcc CAM_CC_MCLK1_CLK>;
++		assigned-clock-rates = <19200000>;
++
++		reset-gpios = <&tlmm 29 GPIO_ACTIVE_LOW>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&cam_mclk1_default>, <&wf_cam_rst>;
++
++		avdd-supply = <&pp2800_wf_cam>;
++		dovdd-supply = <&pp1800_wf_cam>;
++		dvdd-supply = <&pp1800_wf_cam>;
++
++		orientation = <1>;
++		rotation = <0>;
++
++		port {
++			wf_cam_ep: endpoint {
++				data-lanes = <1 2 3 4>;
++				link-frequencies = /bits/ 64 <360000000 180000000>;
++				remote-endpoint = <&csiphy1_ep>;
++			};
++		};
++	};
++
++	wf_cam_eeprom: eeprom@58 {
++		compatible = "atmel,24c64";
++		reg = <0x58>;
++		vcc-supply = <&pp1800_wf_cam>;
++		read-only;
++	};
++
++	wf_cam_vcm: vcm@c {
++		compatible = "dongwoon,dw9714";
++		reg = <0x0c>;
++		vcc-supply = <&pp2800_wf_cam>;
++	};
++};
++
++&tlmm {
++	cam_mclk0_default: cam-mclk0-default-state {
++		pins = "gpio13";
++		function = "cam_mclk";
++		drive-strength = <2>;
++		bias-disable;
++	};
++
++	cam_mclk1_default: cam-mclk1-default-state {
++		pins = "gpio14";
++		function = "cam_mclk";
++		drive-strength = <2>;
++		bias-disable;
++	};
++
++	uf_cam_rst: uf-cam-rst-state {
++		pins = "gpio30";
++		function = "gpio";
++		drive-strength = <2>;
++		bias-disable;
++	};
++
++	wf_cam_rst: wf-cam-rst-state {
++		pins = "gpio29";
++		function = "gpio";
++		drive-strength = <2>;
++		bias-disable;
++	};
++};

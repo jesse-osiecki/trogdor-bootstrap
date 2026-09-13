@@ -1,0 +1,46 @@
+#!/bin/sh
+# Mark the ChromeOS kernel partition we booted from as successful so that
+# depthcharge keeps using it (tries/priority fallback for test kernels).
+# Depthcharge zeroes the priority of a slot whose tries ran out, so restore
+# a high priority for the test slot (pmOS_kernel_b) once it booted fine.
+#
+# 2026-09-09: only bless when a display actually came up. A kernel that
+# reaches userspace with no working DRM output (linux-next without
+# CONFIG_REGULATOR_QCOM_REFGEN did this) must NOT be marked good, otherwise
+# depthcharge never falls back and the machine is stuck on a dark screen.
+set -eu
+for x in $(cat /proc/cmdline); do
+	case "$x" in kern_guid=*) guid="${x#kern_guid=}";; esac
+done
+[ -n "${guid:-}" ] || exit 0
+part=$(findfs PARTUUID="$guid") || exit 0
+disk=$(echo "$part" | sed 's/p[0-9]*$//')
+num=$(echo "$part" | sed 's/.*p//')
+
+display_ok() {
+	for s in /sys/class/drm/card*-*/status; do
+		[ -e "$s" ] || continue
+		[ "$(cat "$s")" = connected ] && return 0
+	done
+	return 1
+}
+i=0
+until display_ok; do
+	i=$((i+1))
+	if [ "$i" -ge 60 ]; then
+		echo "no connected DRM output after 60s; NOT marking $part successful (kernel $(uname -r))"
+		exit 0
+	fi
+	sleep 1
+done
+
+label=$(cgpt show -i "$num" -l "$disk")
+prio=$(cgpt show -i "$num" -P "$disk")
+if [ "$label" = pmOS_kernel_b ] && [ "$prio" -lt 15 ]; then
+	cgpt add -i "$num" -P 15 "$disk"
+	echo "restored priority 15 on $part"
+fi
+if [ "$(cgpt show -i "$num" -S "$disk")" != 1 ]; then
+	cgpt add -i "$num" -S 1 -T 0 "$disk"
+	echo "marked $part (index $num) successful"
+fi

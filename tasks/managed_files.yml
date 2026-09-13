@@ -1,0 +1,28 @@
+---
+# Copy every manifest.txt entry for {{ role_name }} from files/ to its path.
+- name: "{{ role_name }}: read manifest"
+  ansible.builtin.set_fact:
+    managed: >-
+      {{ lookup('file', playbook_dir ~ '/manifest.txt').splitlines()
+         | reject('match', '^\s*(#|$)') | map('split') | list
+         | selectattr(0, 'equalto', role_name) | list }}
+
+- name: "{{ role_name }}: create parent directories"
+  ansible.builtin.file:
+    path: "{{ (item[2] | replace('~', device_home)) | dirname }}"
+    state: directory
+    owner: "{{ device_user if item[2].startswith('~') else 'root' }}"
+    group: "{{ device_user if item[2].startswith('~') else 'root' }}"
+  loop: "{{ managed }}"
+  loop_control: { label: "{{ item[2] }}" }
+
+- name: "{{ role_name }}: install managed files"
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/files{{ item[2] | replace('~', '/HOME') }}"
+    dest: "{{ item[2] | replace('~', device_home) }}"
+    mode: "{{ item[1] }}"
+    owner: "{{ device_user if item[2].startswith('~') else 'root' }}"
+    group: "{{ device_user if item[2].startswith('~') else 'root' }}"
+  loop: "{{ managed }}"
+  loop_control: { label: "{{ item[2] }}" }
+  notify: "{{ role_name }} files changed"

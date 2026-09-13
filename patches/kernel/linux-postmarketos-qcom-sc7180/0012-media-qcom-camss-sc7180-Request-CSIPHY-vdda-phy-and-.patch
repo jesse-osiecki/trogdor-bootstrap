@@ -1,0 +1,55 @@
+From e0137c649990c7b1d63acc6e8481da779e689ee8 Mon Sep 17 00:00:00 2001
+From: Jesse <jesse@jjo.ninja>
+Date: Thu, 3 Sep 2026 00:28:39 -0400
+Subject: [PATCH 12/28] media: qcom: camss: sc7180: Request CSIPHY vdda-phy and
+ vdda-pll supplies
+
+The SC7180 CSIPHYs are powered from PMIC LDOs that are not always-on on
+Chromebook boards (pm6150 ldo4 for the 0.9V rail and pm6150l ldo3 for
+the 1.25V PLL rail). Request them the same way sdm845 does so the PHY is
+powered whenever a camera is streaming.
+Signed-off-by: Jesse <jesse@jjo.ninja>
+---
+ drivers/media/platform/qcom/camss/camss.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/media/platform/qcom/camss/camss.c b/drivers/media/platform/qcom/camss/camss.c
+index f8344fd3e..d48348386 100644
+--- a/drivers/media/platform/qcom/camss/camss.c
++++ b/drivers/media/platform/qcom/camss/camss.c
+@@ -1321,7 +1321,7 @@ static const struct camss_subdev_resources vfe_res_845[] = {
+ static const struct camss_subdev_resources csiphy_res_7180[] = {
+ 	/* CSIPHY0 */
+ 	{
+-		.regulators = {},
++		.regulators = { "vdda-phy", "vdda-pll" },
+ 		.clock = {
+ 			"csiphy0",
+ 			"csiphy0_timer"
+@@ -1340,7 +1340,7 @@ static const struct camss_subdev_resources csiphy_res_7180[] = {
+ 	},
+ 	/* CSIPHY1 */
+ 	{
+-		.regulators = {},
++		.regulators = { "vdda-phy", "vdda-pll" },
+ 		.clock = {
+ 			"csiphy1",
+ 			"csiphy1_timer"
+@@ -1359,7 +1359,7 @@ static const struct camss_subdev_resources csiphy_res_7180[] = {
+ 	},
+ 	/* CSIPHY2 */
+ 	{
+-		.regulators = {},
++		.regulators = { "vdda-phy", "vdda-pll" },
+ 		.clock = {
+ 			"csiphy2",
+ 			"csiphy2_timer"
+@@ -1378,7 +1378,7 @@ static const struct camss_subdev_resources csiphy_res_7180[] = {
+ 	},
+ 	/* CSIPHY3 */
+ 	{
+-		.regulators = {},
++		.regulators = { "vdda-phy", "vdda-pll" },
+ 		.clock = {
+ 			"csiphy3",
+ 			"csiphy3_timer"

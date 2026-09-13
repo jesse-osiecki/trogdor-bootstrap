@@ -1,0 +1,389 @@
+From 494eedc107cc51f14af0cc73ed5a3c5bba9b3fb9 Mon Sep 17 00:00:00 2001
+From: Jesse Osiecki <jesse@jjo.ninja>
+Date: Sun, 13 Sep 2026 12:04:49 -0400
+Subject: [PATCH] Add a PipeWire recorder, musl fixes and rubber stamp
+ fail-closed fixes
+
+Port for postmarketOS (musl, Plasma Mobile) on a Lenovo IdeaPad Duet 3,
+whose cameras are raw MIPI sensors that only exist behind libcamera. No
+V4L2 node hands out finished frames and libcamera's v4l2-compat shim
+segfaults on musl, so the desktop's PipeWire session is the only way to
+get at the front camera.
+
+- recorders/pipewire_reader.py: new recording_plugin "pipewire" using
+  GStreamer pipewiresrc -> videoconvert -> appsink, exposing the small
+  cv2.VideoCapture-like API compare.py expects. Config keys
+  pipewire_target (node name or object.serial) and pipewire_timeout.
+  Falls back to the invoking user's /run/user/<uid> under sudo so
+  `howdy add` and `howdy test` work from a terminal.
+- video_capture.py: skip the device_path existence check for pipewire.
+- pam/main.cc: pass environ to posix_spawnp. A null envp is an empty
+  environment on musl, so the compare process could not find
+  XDG_RUNTIME_DIR and the PipeWire socket.
+- pam/meson.build: link libintl; musl keeps gettext separate.
+- rubberstamps/nod.py: on timeout return failsafe, not its inverse. A
+  faildeadly rule previously approved anyone who simply did not nod.
+- rubberstamps/__init__.py: a stamp that crashes under a faildeadly rule
+  now exits 15 instead of being skipped (which approved the login), and
+  writes to a dead howdy-gtk helper no longer crash the stamp.
+---
+ howdy/src/config.ini                   |  14 ++-
+ howdy/src/meson.build                  |   1 +
+ howdy/src/pam/main.cc                  |   7 +-
+ howdy/src/pam/meson.build              |   3 +
+ howdy/src/recorders/pipewire_reader.py | 168 +++++++++++++++++++++++++
+ howdy/src/recorders/video_capture.py   |  14 ++-
+ howdy/src/rubberstamps/__init__.py     |  21 +++-
+ howdy/src/rubberstamps/nod.py          |   5 +-
+ 8 files changed, 221 insertions(+), 12 deletions(-)
+ create mode 100644 howdy/src/recorders/pipewire_reader.py
+
+diff --git a/howdy/src/config.ini b/howdy/src/config.ini
+index 789347a..3cab435 100644
+--- a/howdy/src/config.ini
++++ b/howdy/src/config.ini
+@@ -68,10 +68,22 @@ frame_height = -1
+ # The lower this setting is, the more dark frames are ignored
+ dark_threshold = 60
+ 
+-# The recorder to use. Can be either opencv (default), ffmpeg or pyv4l2.
++# The recorder to use. Can be either opencv (default), ffmpeg, pyv4l2 or
++# pipewire.
+ # Switching from the default opencv to ffmpeg can help with grayscale issues.
++# Use pipewire for cameras that only exist behind libcamera (no usable V4L2
++# device); device_path is ignored in that case.
+ recording_plugin = opencv
+ 
++# PipeWire node name or object.serial of the camera to use, see `wpctl status`
++# and `pw-cli ls Node`. Empty picks the default camera.
++# PIPEWIRE only.
++pipewire_target =
++
++# Seconds to wait for PipeWire to start streaming or deliver a frame.
++# PIPEWIRE only.
++pipewire_timeout = 5
++
+ # Video format used by ffmpeg. Options include vfwcap or v4l2.
+ # FFMPEG only.
+ device_format = v4l2
+diff --git a/howdy/src/meson.build b/howdy/src/meson.build
+index 36dc05e..2a88ab3 100644
+--- a/howdy/src/meson.build
++++ b/howdy/src/meson.build
+@@ -33,6 +33,7 @@ py_sources = [
+     'paths_factory.py',
+     'recorders/__init__.py',
+     'recorders/ffmpeg_reader.py',
++    'recorders/pipewire_reader.py',
+     'recorders/pyv4l2_reader.py',
+     'recorders/v4l2.py',
+     'recorders/video_capture.py',
+diff --git a/howdy/src/pam/main.cc b/howdy/src/pam/main.cc
+index d3af59d..df98b60 100644
+--- a/howdy/src/pam/main.cc
++++ b/howdy/src/pam/main.cc
+@@ -36,6 +36,8 @@
+ #include "optional_task.hh"
+ #include <paths.hh>
+ 
++extern char **environ; // NOLINT
++
+ const auto DEFAULT_TIMEOUT =
+     std::chrono::duration<int, std::chrono::milliseconds::period>(100);
+ const auto MAX_RETRIES = 5;
+@@ -267,8 +269,11 @@ auto identify(pam_handle_t *pamh, int flags, int argc, const char **argv,
+   pid_t child_pid;
+ 
+   // Start the python subprocess
++  // Pass our environment on: the compare process needs XDG_RUNTIME_DIR &co
++  // to reach the user's PipeWire session (a null envp is an empty environment
++  // on musl)
+   if (posix_spawnp(&child_pid, PYTHON_EXECUTABLE_PATH, nullptr, nullptr,
+-                   const_cast<char *const *>(args), nullptr) != 0) {
++                   const_cast<char *const *>(args), environ) != 0) {
+     syslog(LOG_ERR, "Can't spawn the howdy process: %s (%d)", strerror(errno),
+            errno);
+     return PAM_SYSTEM_ERR;
+diff --git a/howdy/src/pam/meson.build b/howdy/src/pam/meson.build
+index 35cdb03..1f8a8da 100644
+--- a/howdy/src/pam/meson.build
++++ b/howdy/src/pam/meson.build
+@@ -2,6 +2,8 @@ inih_cpp = dependency('INIReader', fallback: ['inih', 'INIReader_dep'])
+ libevdev = dependency('libevdev')
+ libpam = meson.get_compiler('cpp').find_library('pam')
+ threads = dependency('threads')
++# musl keeps gettext in a separate libintl
++intl = dependency('intl')
+ 
+ # Translations
+ subdir('po')
+@@ -24,6 +26,7 @@ shared_library(
+ 		inih_cpp,
+ 		threads,
+ 		libevdev,
++		intl,
+ 	],
+ 	link_depends: [
+ 		paths_h,
+diff --git a/howdy/src/recorders/pipewire_reader.py b/howdy/src/recorders/pipewire_reader.py
+new file mode 100644
+index 0000000..a6e6b6f
+--- /dev/null
++++ b/howdy/src/recorders/pipewire_reader.py
+@@ -0,0 +1,168 @@
++# Frame reader that pulls video from PipeWire through GStreamer.
++#
++# Some cameras only exist behind libcamera (raw MIPI CSI sensors on Qualcomm
++# camss, for example): there is no V4L2 node that hands out finished frames,
++# and the libcamera pipeline can only be held by one process. On a desktop
++# that process is PipeWire's libcamera plugin, so the way to get frames is to
++# be a PipeWire client. This reader does that with pipewiresrc and an appsink
++# and presents the same tiny API compare.py expects from cv2.VideoCapture.
++
++import os
++import pwd
++import sys
++
++import numpy
++from cv2 import CAP_PROP_FRAME_WIDTH
++from cv2 import CAP_PROP_FRAME_HEIGHT
++from i18n import _
++
++try:
++	import gi
++	gi.require_version("Gst", "1.0")
++	gi.require_version("GstApp", "1.0")
++	from gi.repository import Gst, GstApp  # noqa: F401  (GstApp registers appsink methods)
++except (ImportError, ValueError):
++	print(_("Missing GStreamer python bindings, please install python3-gi (py3-gobject3) and gst-plugins-base"))
++	sys.exit(12)
++
++
++def _find_pipewire_runtime_dir():
++	"""
++	PipeWire locates its socket through PIPEWIRE_RUNTIME_DIR or
++	XDG_RUNTIME_DIR. Under sudo/doas/pkexec (howdy add, howdy test) those
++	point at root's session, not the desktop user's, so fall back to the
++	invoking user's /run/user/<uid>.
++	"""
++	for var in ("PIPEWIRE_RUNTIME_DIR", "XDG_RUNTIME_DIR"):
++		d = os.environ.get(var)
++		if d and os.path.exists(os.path.join(d, "pipewire-0")):
++			return
++
++	uid = None
++	for var in ("SUDO_UID", "PKEXEC_UID"):
++		if os.environ.get(var):
++			uid = int(os.environ[var])
++			break
++	if uid is None:
++		for var in ("SUDO_USER", "DOAS_USER"):
++			if os.environ.get(var):
++				uid = pwd.getpwnam(os.environ[var]).pw_uid
++				break
++	if uid is None:
++		uid = os.getuid()
++
++	d = "/run/user/%d" % uid
++	if os.path.exists(os.path.join(d, "pipewire-0")):
++		os.environ["PIPEWIRE_RUNTIME_DIR"] = d
++
++
++class pipewire_reader:
++	"""Looks like the subset of cv2.VideoCapture that Howdy uses."""
++
++	def __init__(self, target="", timeout=5.0):
++		# PipeWire node name or object.serial of the camera; empty means the default camera
++		self.target = target
++		# Seconds to wait for the pipeline to start / for a single frame
++		self.timeout = timeout
++		self.pipeline = None
++		self.sink = None
++		self.width = 0
++		self.height = 0
++		self.req_width = -1
++		self.req_height = -1
++
++	def set(self, prop, setting):
++		"""Remember a requested size; applied when the pipeline starts"""
++		if prop == CAP_PROP_FRAME_WIDTH:
++			self.req_width = int(setting)
++		elif prop == CAP_PROP_FRAME_HEIGHT:
++			self.req_height = int(setting)
++		# Every other property (fps, fourcc, exposure) has no meaning here
++
++	def get(self, prop):
++		"""Negotiated frame size"""
++		self._start()
++		if prop == CAP_PROP_FRAME_WIDTH:
++			return self.width
++		elif prop == CAP_PROP_FRAME_HEIGHT:
++			return self.height
++		return 0
++
++	def _start(self):
++		if self.pipeline is not None:
++			return
++
++		_find_pipewire_runtime_dir()
++		Gst.init(None)
++
++		src = "pipewiresrc do-timestamp=true"
++		if self.target:
++			src += ' target-object="%s"' % self.target
++		caps = "video/x-raw,format=BGR"
++		if self.req_width > 0:
++			caps += ",width=%d" % self.req_width
++		if self.req_height > 0:
++			caps += ",height=%d" % self.req_height
++		desc = "%s ! videoconvert ! %s ! appsink name=sink max-buffers=1 drop=true sync=false" % (src, caps)
++
++		try:
++			self.pipeline = Gst.parse_launch(desc)
++		except Exception as err:
++			print(_("Failed to build the PipeWire capture pipeline: {}").format(err))
++			sys.exit(14)
++		self.sink = self.pipeline.get_by_name("sink")
++
++		self.pipeline.set_state(Gst.State.PLAYING)
++		ret, _state, _pending = self.pipeline.get_state(int(self.timeout * Gst.SECOND))
++		if ret == Gst.StateChangeReturn.FAILURE:
++			print(_("Failed to open the PipeWire camera{}, is pipewire running for this user?").format(" " + self.target if self.target else ""))
++			self.release()
++			sys.exit(14)
++
++		# Pull one sample so the size is known before compare.py asks for it
++		sample = self.sink.try_pull_sample(int(self.timeout * Gst.SECOND))
++		if sample is None:
++			print(_("No frames arrived from PipeWire within {} seconds").format(self.timeout))
++			self.release()
++			sys.exit(14)
++		self._sample_to_frame(sample)
++
++	def _sample_to_frame(self, sample):
++		caps = sample.get_caps().get_structure(0)
++		self.width = caps.get_value("width")
++		self.height = caps.get_value("height")
++
++		buf = sample.get_buffer()
++		ok, info = buf.map(Gst.MapFlags.READ)
++		if not ok:
++			return None
++		try:
++			# GStreamer pads BGR rows to a 4-byte stride, so index by stride and trim
++			stride = info.size // self.height
++			flat = numpy.frombuffer(info.data, dtype=numpy.uint8, count=stride * self.height)
++			frame = flat.reshape((self.height, stride))[:, :self.width * 3].reshape((self.height, self.width, 3)).copy()
++		finally:
++			buf.unmap(info)
++		return frame
++
++	def read(self):
++		"""Return (ok, frame) like cv2.VideoCapture.read"""
++		self._start()
++		sample = self.sink.try_pull_sample(int(self.timeout * Gst.SECOND))
++		if sample is None:
++			return False, None
++		frame = self._sample_to_frame(sample)
++		return frame is not None, frame
++
++	def grab(self):
++		"""Wake the camera up and discard a frame"""
++		self.read()
++
++	def release(self):
++		if self.pipeline is not None:
++			self.pipeline.set_state(Gst.State.NULL)
++			self.pipeline = None
++			self.sink = None
++
++	def __del__(self):
++		self.release()
+diff --git a/howdy/src/recorders/video_capture.py b/howdy/src/recorders/video_capture.py
+index 15888a5..fc32d19 100644
+--- a/howdy/src/recorders/video_capture.py
++++ b/howdy/src/recorders/video_capture.py
+@@ -31,8 +31,10 @@ class VideoCapture:
+ 		else:
+ 			self.config = config
+ 
+-		# Check device path
+-		if not os.path.exists(self.config.get("video", "device_path")):
++		# Check device path (PipeWire cameras are named, not paths)
++		if self.config.get("video", "recording_plugin", fallback="opencv") == "pipewire":
++			pass
++		elif not os.path.exists(self.config.get("video", "device_path")):
+ 			if self.config.getboolean("video", "warn_no_device", fallback=True):
+ 				print(_("Howdy could not find a camera device at the path specified in the config file."))
+ 				print(_("It is very likely that the path is not configured correctly, please edit the 'device_path' config value by running:"))
+@@ -110,6 +112,14 @@ class VideoCapture:
+ 				self.config.get("video", "device_format", fallback="v4l2")
+ 			)
+ 
++		elif recording_plugin == "pipewire":
++			# Pull frames from PipeWire (libcamera-only cameras)
++			from recorders.pipewire_reader import pipewire_reader
++			self.internal = pipewire_reader(
++				self.config.get("video", "pipewire_target", fallback=""),
++				self.config.getfloat("video", "pipewire_timeout", fallback=5.0)
++			)
++
+ 		elif recording_plugin == "pyv4l2":
+ 			# Set the capture source for pyv4l2
+ 			from recorders.pyv4l2_reader import pyv4l2_reader
+diff --git a/howdy/src/rubberstamps/__init__.py b/howdy/src/rubberstamps/__init__.py
+index 57a115f..aa13324 100644
+--- a/howdy/src/rubberstamps/__init__.py
++++ b/howdy/src/rubberstamps/__init__.py
+@@ -32,13 +32,18 @@ class RubberStamp:
+ 
+ 		# If we're connected to the ui
+ 		if self.gtk_proc:
+-			# Send the command as bytes
+-			self.gtk_proc.stdin.write(bytearray(command.encode("utf-8")))
+-			self.gtk_proc.stdin.flush()
++			try:
++				# Send the command as bytes
++				self.gtk_proc.stdin.write(bytearray(command.encode("utf-8")))
++				self.gtk_proc.stdin.flush()
+ 
+-			# Write a padding line to force the command through any buffers
+-			self.gtk_proc.stdin.write(bytearray("P=_PADDING \n".encode("utf-8")))
+-			self.gtk_proc.stdin.flush()
++				# Write a padding line to force the command through any buffers
++				self.gtk_proc.stdin.write(bytearray("P=_PADDING \n".encode("utf-8")))
++				self.gtk_proc.stdin.flush()
++			except OSError:
++				# The auth ui died (or never came up, e.g. on a locked Wayland
++				# session); the stamp must keep working without it
++				self.gtk_proc = None
+ 
+ 
+ def execute(config, gtk_proc, opencv):
+@@ -163,6 +168,10 @@ def execute(config, gtk_proc, opencv):
+ 
+ 			import traceback
+ 			traceback.print_exc()
++
++			# A crashed stamp must not silently approve a faildeadly rule
++			if not instance.options["failsafe"]:
++				sys.exit(15)
+ 			continue
+ 
+ 		if verbose: print("Stamp \"" + type + "\" returned: " + str(result))
+diff --git a/howdy/src/rubberstamps/nod.py b/howdy/src/rubberstamps/nod.py
+index 56f3c0a..d1fdb68 100644
+--- a/howdy/src/rubberstamps/nod.py
++++ b/howdy/src/rubberstamps/nod.py
+@@ -94,5 +94,6 @@ class nod(RubberStamp):
+ 				last_reldist = reldist
+ 				last_nosepoint[axis] = nosepoint
+ 
+-		# We've fallen out of the loop, so timeout has been hit
+-		return not self.options["failsafe"]
++		# We've fallen out of the loop, so timeout has been hit:
++		# failsafe passes on timeout, faildeadly fails on timeout
++		return self.options["failsafe"]
+-- 
+2.54.0
+

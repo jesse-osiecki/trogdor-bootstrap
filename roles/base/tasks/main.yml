@@ -1,0 +1,50 @@
+---
+- name: Packages every device gets
+  ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/apk.yml"
+  vars:
+    apk_packages: [bash, keyd, cros-keyboard-map, libcamera-tools, pipewire-tools]
+
+- name: Managed files (sleep LED hook, sysctl, accel udev rule, libcamera tuning)
+  ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/managed_files.yml"
+  vars: { role_name: base }
+
+# keyd: cros-keyboard-map matches k:18d1:5057, which is both the Hammer keyboard
+# and its touchpad, so keyd grabs the touchpad and the cursor jumps to the finger.
+# Narrow the match to the keyboard's device hash. See ~/code/keyd-touchpad-fix.md.
+- name: keyd matches only the Hammer keyboard, not the touchpad
+  ansible.builtin.lineinfile:
+    path: /etc/keyd/default.conf
+    regexp: '^k:18d1:5057(:[0-9a-f]+)?\s*$'
+    line: "k:18d1:5057:{{ keyd_keyboard_hash }}"
+    backup: true
+  notify: reload keyd
+
+- name: zram swap at {{ zram_swap_pct }}% of RAM
+  ansible.builtin.lineinfile:
+    path: /etc/deviceinfo
+    regexp: '^deviceinfo_zram_swap_pct='
+    line: 'deviceinfo_zram_swap_pct="{{ zram_swap_pct }}"'
+
+- name: Locally built packages present in apks/
+  ansible.builtin.stat:
+    path: "{{ playbook_dir }}/apks/{{ item }}"
+  loop: "{{ local_apks }}"
+  register: apk_files
+
+- name: Which local packages are already installed at this version
+  ansible.builtin.shell: >
+    apk info -v {{ item.item | regex_replace('-[0-9][^-]*-r[0-9]+\.apk$', '') }}
+    | grep -qx {{ item.item | regex_replace('\.apk$', '') }}
+  loop: "{{ apk_files.results }}"
+  loop_control: { label: "{{ item.item }}" }
+  register: apk_installed
+  changed_when: false
+  failed_when: false
+  check_mode: false
+  when: item.stat.exists
+
+- name: Install local packages (kernel with camera series, patched qmlkonsole)
+  ansible.builtin.command: >
+    apk add --allow-untrusted
+    {% for r in apk_installed.results if r.item.stat.exists and r.rc != 0 %}{{ playbook_dir }}/apks/{{ r.item.item }} {% endfor %}
+  when: apk_installed.results | selectattr('item.stat.exists') | rejectattr('rc', 'equalto', 0) | list | length > 0

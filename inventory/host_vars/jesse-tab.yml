@@ -1,0 +1,6 @@
+# Jesse's Duet 3 as it is configured today (see ~/code/INDEX.md).
+enable_dev: true
+enable_unattended: false     # secure-mode-on was run 2026-09-12; flip to true for kernel-test campaigns
+enable_face_unlock: true
+keyd_keyboard_hash: eb4bc35f
+howdy_pipewire_target: libcamera_input._base_soc_0_cci_ac4a000_i2c-bus_0_camera_36

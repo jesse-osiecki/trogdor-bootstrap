@@ -1,0 +1,2499 @@
+From 313cc9f76c950fe08c081274be91c9409e4e2bdb Mon Sep 17 00:00:00 2001
+From: Jesse <jesse@jjo.ninja>
+Date: Thu, 3 Sep 2026 20:48:56 -0400
+Subject: [PATCH] linux-postmarketos-qcom-sc7180: add camera support for
+ google-trogdor wormdingler
+
+Add the SC7180 camera subsystem (CAMSS), the CCI camera I2C controller
+and the two MIPI cameras of the Lenovo IdeaPad Duet 3 (wormdingler):
+OV5675 (front) and OV8856 (rear, with DW9714 VCM). Enable the sensor and
+VCM drivers as modules.
+
+Patches 0006-0022 are the series being sent upstream ("media: qcom:
+camss: Add SC7180 support and the Lenovo IdeaPad Duet 3 cameras", v3 of
+George Chan's 2024 series with fixes), 0023-0028 are i2c-qcom-cci
+runtime PM fixes already in mainline 6.19 that avoid a WARN on resume.
+
+Tested on wormdingler: both cameras stream at 30 fps with libcamera
+(simple pipeline + software ISP), Plasma Camera works, PipeWire lists
+both cameras, suspend/resume is clean.
+---
+ ...a-qcom-sc7180-camss-Add-SC7180-CAMSS.patch | 363 ++++++++++++++++++
+ ...-qcom-cci-Document-SC7180-compatible.patch |  31 ++
+ ...hy-3ph-Add-Gen2-v1.2.2-two-phase-MIP.patch | 186 +++++++++
+ ...-media-qcom-camss-Add-sc7180-support.patch |  34 ++
+ ...edia-qcom-camss-Add-sc7180-resources.patch | 312 +++++++++++++++
+ ...amss-sc7180-Add-interconnect-support.patch |  62 +++
+ ...-sc7180-Request-CSIPHY-vdda-phy-and-.patch |  55 +++
+ ...180-Skip-halt-check-for-gcc_camera_h.patch |  35 ++
+ ...-Report-the-active-media-bus-code-fr.patch |  44 +++
+ ...a-i2c-ov8856-Implement-get_selection.patch |  75 ++++
+ ...-Don-t-power-off-an-already-suspende.patch |  35 ++
+ ...-Register-the-orientation-and-rotati.patch |  45 +++
+ ...a-i2c-ovti-ov8856-Allow-video-interf.patch |  39 ++
+ ...a-i2c-ovti-ov5675-ovti-ov8856-Allow-.patch |  45 +++
+ ...c7180-camss-Add-CAMSS-block-definiti.patch | 185 +++++++++
+ ...c7180-Add-CCI0-camera-control-interf.patch | 107 ++++++
+ ...c7180-trogdor-wormdingler-Add-MIPI-c.patch | 173 +++++++++
+ ...ove-unused-CCI_RES_MAX-macro-definit.patch |  33 ++
+ ...o-not-check-return-value-of-cci_init.patch |  51 +++
+ ...ve-cci_init-under-cci_reset-function.patch |  96 +++++
+ ...emove-overcautious-disable_irq-calls.patch |  50 +++
+ ...p-custom-suspend-resume-and-rely-on-.patch |  57 +++
+ ...i2c-qcom-cci-fix-autosuspend-cleanup.patch |  71 ++++
+ .../linux-postmarketos-qcom-sc7180/APKBUILD   |  50 ++-
+ .../config-postmarketos-qcom-sc7180.aarch64   |   6 +-
+ 25 files changed, 2235 insertions(+), 5 deletions(-)
+ create mode 100644 device/community/linux-postmarketos-qcom-sc7180/0006-dt-bindings-media-qcom-sc7180-camss-Add-SC7180-CAMSS.patch
+ create mode 100644 device/community/linux-postmarketos-qcom-sc7180/0007-dt-bindings-i2c-qcom-cci-Document-SC7180-compatible.patch
+ create mode 100644 device/community/linux-postmarketos-qcom-sc7180/0008-media-camss-csiphy-3ph-Add-Gen2-v1.2.2-two-phase-MIP.patch
+ create mode 100644 device/community/linux-postmarketos-qcom-sc7180/0009-media-qcom-camss-Add-sc7180-support.patch
+ create mode 100644 device/community/linux-postmarketos-qcom-sc7180/0010-media-qcom-camss-Add-sc7180-resources.patch
+ create mode 100644 device/community/linux-postmarketos-qcom-sc7180/0011-media-qcom-camss-sc7180-Add-interconnect-support.patch
+ create mode 100644 device/community/linux-postmarketos-qcom-sc7180/0012-media-qcom-camss-sc7180-Request-CSIPHY-vdda-phy-and-.patch
+ create mode 100644 device/community/linux-postmarketos-qcom-sc7180/0013-clk-qcom-gcc-sc7180-Skip-halt-check-for-gcc_camera_h.patch
+ create mode 100644 device/community/linux-postmarketos-qcom-sc7180/0014-media-i2c-ov8856-Report-the-active-media-bus-code-fr.patch
+ create mode 100644 device/community/linux-postmarketos-qcom-sc7180/0015-media-i2c-ov8856-Implement-get_selection.patch
+ create mode 100644 device/community/linux-postmarketos-qcom-sc7180/0016-media-i2c-ov8856-Don-t-power-off-an-already-suspende.patch
+ create mode 100644 device/community/linux-postmarketos-qcom-sc7180/0017-media-i2c-ov8856-Register-the-orientation-and-rotati.patch
+ create mode 100644 device/community/linux-postmarketos-qcom-sc7180/0018-dt-bindings-media-i2c-ovti-ov8856-Allow-video-interf.patch
+ create mode 100644 device/community/linux-postmarketos-qcom-sc7180/0019-dt-bindings-media-i2c-ovti-ov5675-ovti-ov8856-Allow-.patch
+ create mode 100644 device/community/linux-postmarketos-qcom-sc7180/0020-arm64-dts-qcom-sc7180-camss-Add-CAMSS-block-definiti.patch
+ create mode 100644 device/community/linux-postmarketos-qcom-sc7180/0021-arm64-dts-qcom-sc7180-Add-CCI0-camera-control-interf.patch
+ create mode 100644 device/community/linux-postmarketos-qcom-sc7180/0022-arm64-dts-qcom-sc7180-trogdor-wormdingler-Add-MIPI-c.patch
+ create mode 100644 device/community/linux-postmarketos-qcom-sc7180/0023-i2c-qcom-cci-Remove-unused-CCI_RES_MAX-macro-definit.patch
+ create mode 100644 device/community/linux-postmarketos-qcom-sc7180/0024-i2c-qcom-cci-Do-not-check-return-value-of-cci_init.patch
+ create mode 100644 device/community/linux-postmarketos-qcom-sc7180/0025-i2c-qcom-cci-Move-cci_init-under-cci_reset-function.patch
+ create mode 100644 device/community/linux-postmarketos-qcom-sc7180/0026-i2c-qcom-cci-Remove-overcautious-disable_irq-calls.patch
+ create mode 100644 device/community/linux-postmarketos-qcom-sc7180/0027-i2c-qcom-cci-drop-custom-suspend-resume-and-rely-on-.patch
+ create mode 100644 device/community/linux-postmarketos-qcom-sc7180/0028-i2c-qcom-cci-fix-autosuspend-cleanup.patch
+
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/0006-dt-bindings-media-qcom-sc7180-camss-Add-SC7180-CAMSS.patch b/device/community/linux-postmarketos-qcom-sc7180/0006-dt-bindings-media-qcom-sc7180-camss-Add-SC7180-CAMSS.patch
+new file mode 100644
+index 0000000..1112a28
+--- /dev/null
++++ b/device/community/linux-postmarketos-qcom-sc7180/0006-dt-bindings-media-qcom-sc7180-camss-Add-SC7180-CAMSS.patch
+@@ -0,0 +1,363 @@
++From 34d2d0f58aad54cddca701c7472c099bbabe1990 Mon Sep 17 00:00:00 2001
++From: George Chan <gchan9527@gmail.com>
++Date: Mon, 24 Jun 2024 07:22:40 +0800
++Subject: [PATCH 06/28] dt-bindings: media: qcom,sc7180-camss: Add SC7180 CAMSS
++ binding
++
++Document the CAMSS block of SC7180 (CSIPHY 0-3, CSID 0-2, VFE 0/1 and
++VFE lite). Based on the SDM845 binding with the _src clock references
++removed.
++Co-developed-by: Jesse <jesse@jjo.ninja>
++Signed-off-by: Jesse <jesse@jjo.ninja>
++---
++ .../bindings/media/qcom,sc7180-camss.yaml     | 341 ++++++++++++++++++
++ 1 file changed, 341 insertions(+)
++ create mode 100644 Documentation/devicetree/bindings/media/qcom,sc7180-camss.yaml
++
++diff --git a/Documentation/devicetree/bindings/media/qcom,sc7180-camss.yaml b/Documentation/devicetree/bindings/media/qcom,sc7180-camss.yaml
++new file mode 100644
++index 000000000..b9ed0c12c
++--- /dev/null
+++++ b/Documentation/devicetree/bindings/media/qcom,sc7180-camss.yaml
++@@ -0,0 +1,341 @@
+++# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+++
+++%YAML 1.2
+++---
+++$id: http://devicetree.org/schemas/media/qcom,sc7180-camss.yaml#
+++$schema: http://devicetree.org/meta-schemas/core.yaml#
+++
+++title: Qualcomm Camera SubSystem
+++
+++maintainers:
+++  - Bryan O'Donoghue <bryan.odonoghue@linaro.org>
+++
+++description:
+++  The CAMSS IP is a CSI decoder and ISP present on Qualcomm platforms
+++
+++properties:
+++  compatible:
+++    const: qcom,sc7180-camss
+++
+++  clocks:
+++    maxItems: 24
+++
+++  clock-names:
+++    items:
+++      - const: camnoc_axi
+++      - const: cpas_ahb
+++      - const: csi0
+++      - const: csi1
+++      - const: csi2
+++      - const: csiphy0
+++      - const: csiphy0_timer
+++      - const: csiphy1
+++      - const: csiphy1_timer
+++      - const: csiphy2
+++      - const: csiphy2_timer
+++      - const: csiphy3
+++      - const: csiphy3_timer
+++      - const: gcc_camera_ahb
+++      - const: gcc_camera_axi
+++      - const: soc_ahb
+++      - const: vfe0_axi
+++      - const: vfe0
+++      - const: vfe0_cphy_rx
+++      - const: vfe1_axi
+++      - const: vfe1
+++      - const: vfe1_cphy_rx
+++      - const: vfe_lite
+++      - const: vfe_lite_cphy_rx
+++
+++  interrupts:
+++    maxItems: 10
+++
+++  interrupt-names:
+++    items:
+++      - const: csid0
+++      - const: csid1
+++      - const: csid2
+++      - const: csiphy0
+++      - const: csiphy1
+++      - const: csiphy2
+++      - const: csiphy3
+++      - const: vfe0
+++      - const: vfe1
+++      - const: vfe_lite
+++
+++  interconnects:
+++    maxItems: 4
+++
+++  interconnect-names:
+++    items:
+++      - const: cam_ahb
+++      - const: cam_hf_0_camnoc
+++      - const: cam_hf_1_camnoc
+++      - const: cam_sf_camnoc
+++
+++  iommus:
+++    maxItems: 3
+++
+++  power-domains:
+++    items:
+++      - description: IFE0 GDSC - Image Front End, Global Distributed Switch Controller.
+++      - description: IFE1 GDSC - Image Front End, Global Distributed Switch Controller.
+++      - description: Titan GDSC - Titan ISP Block, Global Distributed Switch Controller.
+++
+++  power-domain-names:
+++    items:
+++      - const: ife0
+++      - const: ife1
+++      - const: top
+++
+++  ports:
+++    $ref: /schemas/graph.yaml#/properties/ports
+++
+++    description:
+++      CSI input ports.
+++
+++    properties:
+++      port@0:
+++        $ref: /schemas/graph.yaml#/$defs/port-base
+++        unevaluatedProperties: false
+++        description:
+++          Input port for receiving CSI data.
+++
+++        properties:
+++          endpoint:
+++            $ref: video-interfaces.yaml#
+++            unevaluatedProperties: false
+++
+++            properties:
+++              data-lanes:
+++                minItems: 1
+++                maxItems: 4
+++
+++            required:
+++              - data-lanes
+++
+++      port@1:
+++        $ref: /schemas/graph.yaml#/$defs/port-base
+++        unevaluatedProperties: false
+++        description:
+++          Input port for receiving CSI data.
+++
+++        properties:
+++          endpoint:
+++            $ref: video-interfaces.yaml#
+++            unevaluatedProperties: false
+++
+++            properties:
+++              data-lanes:
+++                minItems: 1
+++                maxItems: 4
+++
+++            required:
+++              - data-lanes
+++
+++      port@2:
+++        $ref: /schemas/graph.yaml#/$defs/port-base
+++        unevaluatedProperties: false
+++        description:
+++          Input port for receiving CSI data.
+++
+++        properties:
+++          endpoint:
+++            $ref: video-interfaces.yaml#
+++            unevaluatedProperties: false
+++
+++            properties:
+++              data-lanes:
+++                minItems: 1
+++                maxItems: 4
+++
+++            required:
+++              - data-lanes
+++
+++      port@3:
+++        $ref: /schemas/graph.yaml#/$defs/port-base
+++        unevaluatedProperties: false
+++        description:
+++          Input port for receiving CSI data.
+++
+++        properties:
+++          endpoint:
+++            $ref: video-interfaces.yaml#
+++            unevaluatedProperties: false
+++
+++            properties:
+++              data-lanes:
+++                minItems: 1
+++                maxItems: 4
+++
+++            required:
+++              - data-lanes
+++
+++  reg:
+++    maxItems: 10
+++
+++  reg-names:
+++    items:
+++      - const: csid0
+++      - const: csid1
+++      - const: csid2
+++      - const: csiphy0
+++      - const: csiphy1
+++      - const: csiphy2
+++      - const: csiphy3
+++      - const: vfe0
+++      - const: vfe1
+++      - const: vfe_lite
+++
+++  vdda-phy-supply:
+++    description:
+++      Phandle to a regulator supply to PHY core block.
+++
+++  vdda-pll-supply:
+++    description:
+++      Phandle to 1.8V regulator supply to PHY refclk pll block.
+++
+++required:
+++  - clock-names
+++  - clocks
+++  - compatible
+++  - interrupt-names
+++  - interrupts
+++  - iommus
+++  - power-domains
+++  - power-domain-names
+++  - reg
+++  - reg-names
+++  - vdda-phy-supply
+++  - vdda-pll-supply
+++
+++additionalProperties: false
+++
+++examples:
+++  - |
+++    #include <dt-bindings/interrupt-controller/arm-gic.h>
+++    #include <dt-bindings/clock/qcom,camcc-sc7180.h>
+++    #include <dt-bindings/clock/qcom,gcc-sc7180.h>
+++
+++    soc {
+++      #address-cells = <2>;
+++      #size-cells = <2>;
+++
+++      camss: camss@acb3000 {
+++        compatible = "qcom,sc7180-camss";
+++
+++        reg = <0 0xacb3000 0 0x1000>,
+++              <0 0xacba000 0 0x1000>,
+++              <0 0xacc8000 0 0x1000>,
+++              <0 0xac65000 0 0x1000>,
+++              <0 0xac66000 0 0x1000>,
+++              <0 0xac67000 0 0x1000>,
+++              <0 0xac68000 0 0x1000>,
+++              <0 0xacaf000 0 0x4000>,
+++              <0 0xacb6000 0 0x4000>,
+++              <0 0xacc4000 0 0x4000>;
+++
+++        reg-names = "csid0",
+++                    "csid1",
+++                    "csid2",
+++                    "csiphy0",
+++                    "csiphy1",
+++                    "csiphy2",
+++                    "csiphy3",
+++                    "vfe0",
+++                    "vfe1",
+++                    "vfe_lite";
+++
+++        clocks = <&camcc CAM_CC_CAMNOC_AXI_CLK>,
+++                 <&camcc CAM_CC_CPAS_AHB_CLK>,
+++                 <&camcc CAM_CC_IFE_0_CSID_CLK>,
+++                 <&camcc CAM_CC_IFE_1_CSID_CLK>,
+++                 <&camcc CAM_CC_IFE_LITE_CSID_CLK>,
+++                 <&camcc CAM_CC_CSIPHY0_CLK>,
+++                 <&camcc CAM_CC_CSI0PHYTIMER_CLK>,
+++                 <&camcc CAM_CC_CSIPHY1_CLK>,
+++                 <&camcc CAM_CC_CSI1PHYTIMER_CLK>,
+++                 <&camcc CAM_CC_CSIPHY2_CLK>,
+++                 <&camcc CAM_CC_CSI2PHYTIMER_CLK>,
+++                 <&camcc CAM_CC_CSIPHY3_CLK>,
+++                 <&camcc CAM_CC_CSI3PHYTIMER_CLK>,
+++                 <&gcc GCC_CAMERA_AHB_CLK>,
+++                 <&gcc GCC_CAMERA_HF_AXI_CLK>,
+++                 <&camcc CAM_CC_SOC_AHB_CLK>,
+++                 <&camcc CAM_CC_IFE_0_AXI_CLK>,
+++                 <&camcc CAM_CC_IFE_0_CLK>,
+++                 <&camcc CAM_CC_IFE_0_CPHY_RX_CLK>,
+++                 <&camcc CAM_CC_IFE_1_AXI_CLK>,
+++                 <&camcc CAM_CC_IFE_1_CLK>,
+++                 <&camcc CAM_CC_IFE_1_CPHY_RX_CLK>,
+++                 <&camcc CAM_CC_IFE_LITE_CLK>,
+++                 <&camcc CAM_CC_IFE_LITE_CPHY_RX_CLK>;
+++
+++        clock-names = "camnoc_axi",
+++                      "cpas_ahb",
+++                      "csi0",
+++                      "csi1",
+++                      "csi2",
+++                      "csiphy0",
+++                      "csiphy0_timer",
+++                      "csiphy1",
+++                      "csiphy1_timer",
+++                      "csiphy2",
+++                      "csiphy2_timer",
+++                      "csiphy3",
+++                      "csiphy3_timer",
+++                      "gcc_camera_ahb",
+++                      "gcc_camera_axi",
+++                      "soc_ahb",
+++                      "vfe0_axi",
+++                      "vfe0",
+++                      "vfe0_cphy_rx",
+++                      "vfe1_axi",
+++                      "vfe1",
+++                      "vfe1_cphy_rx",
+++                      "vfe_lite",
+++                      "vfe_lite_cphy_rx";
+++
+++        interrupts = <GIC_SPI 464 IRQ_TYPE_LEVEL_HIGH>,
+++                     <GIC_SPI 466 IRQ_TYPE_LEVEL_HIGH>,
+++                     <GIC_SPI 473 IRQ_TYPE_LEVEL_HIGH>,
+++                     <GIC_SPI 477 IRQ_TYPE_LEVEL_HIGH>,
+++                     <GIC_SPI 478 IRQ_TYPE_LEVEL_HIGH>,
+++                     <GIC_SPI 479 IRQ_TYPE_LEVEL_HIGH>,
+++                     <GIC_SPI 448 IRQ_TYPE_LEVEL_HIGH>,
+++                     <GIC_SPI 465 IRQ_TYPE_LEVEL_HIGH>,
+++                     <GIC_SPI 467 IRQ_TYPE_LEVEL_HIGH>,
+++                     <GIC_SPI 472 IRQ_TYPE_LEVEL_HIGH>;
+++
+++        interrupt-names = "csid0",
+++                          "csid1",
+++                          "csid2",
+++                          "csiphy0",
+++                          "csiphy1",
+++                          "csiphy2",
+++                          "csiphy3",
+++                          "vfe0",
+++                          "vfe1",
+++                          "vfe_lite";
+++
+++        iommus = <&apps_smmu 0x820 0x0>,
+++                 <&apps_smmu 0x840 0x0>,
+++                 <&apps_smmu 0x860 0x0>;
+++
+++        power-domains = <&camcc IFE_0_GDSC>,
+++                        <&camcc IFE_1_GDSC>,
+++                        <&camcc TITAN_TOP_GDSC>;
+++
+++        power-domain-names = "ife0",
+++                             "ife1",
+++                             "top";
+++
+++        vdda-phy-supply = <&vreg_l1a_0p875>;
+++        vdda-pll-supply = <&vreg_l26a_1p2>;
+++
+++        ports {
+++          #address-cells = <1>;
+++          #size-cells = <0>;
+++        };
+++      };
+++    };
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/0007-dt-bindings-i2c-qcom-cci-Document-SC7180-compatible.patch b/device/community/linux-postmarketos-qcom-sc7180/0007-dt-bindings-i2c-qcom-cci-Document-SC7180-compatible.patch
+new file mode 100644
+index 0000000..1e1e6ec
+--- /dev/null
++++ b/device/community/linux-postmarketos-qcom-sc7180/0007-dt-bindings-i2c-qcom-cci-Document-SC7180-compatible.patch
+@@ -0,0 +1,31 @@
++From 10401d26de459f1f0a3a5eae962fa8c4bfca2a8c Mon Sep 17 00:00:00 2001
++From: Jesse <jesse@jjo.ninja>
++Date: Thu, 3 Sep 2026 00:33:26 -0400
++Subject: [PATCH 07/28] dt-bindings: i2c: qcom-cci: Document SC7180 compatible
++
++SC7180 CCI is a CCI v2 block with the same clock list as SDM845.
++Signed-off-by: Jesse <jesse@jjo.ninja>
++---
++ Documentation/devicetree/bindings/i2c/qcom,i2c-cci.yaml | 2 ++
++ 1 file changed, 2 insertions(+)
++
++diff --git a/Documentation/devicetree/bindings/i2c/qcom,i2c-cci.yaml b/Documentation/devicetree/bindings/i2c/qcom,i2c-cci.yaml
++index 9bc99d736..0cba00222 100644
++--- a/Documentation/devicetree/bindings/i2c/qcom,i2c-cci.yaml
+++++ b/Documentation/devicetree/bindings/i2c/qcom,i2c-cci.yaml
++@@ -27,6 +27,7 @@ properties:
++           - enum:
++               - qcom,qcm2290-cci
++               - qcom,sa8775p-cci
+++              - qcom,sc7180-cci
++               - qcom,sc7280-cci
++               - qcom,sc8280xp-cci
++               - qcom,sdm670-cci
++@@ -183,6 +184,7 @@ allOf:
++         compatible:
++           contains:
++             enum:
+++              - qcom,sc7180-cci
++               - qcom,sdm845-cci
++               - qcom,sm6350-cci
++     then:
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/0008-media-camss-csiphy-3ph-Add-Gen2-v1.2.2-two-phase-MIP.patch b/device/community/linux-postmarketos-qcom-sc7180/0008-media-camss-csiphy-3ph-Add-Gen2-v1.2.2-two-phase-MIP.patch
+new file mode 100644
+index 0000000..531a9aa
+--- /dev/null
++++ b/device/community/linux-postmarketos-qcom-sc7180/0008-media-camss-csiphy-3ph-Add-Gen2-v1.2.2-two-phase-MIP.patch
+@@ -0,0 +1,186 @@
++From 15d096fd1773110ef675a341f6e0f57029673143 Mon Sep 17 00:00:00 2001
++From: George Chan <gchan9527@gmail.com>
++Date: Sun, 30 Mar 2025 16:00:34 +0800
++Subject: [PATCH 08/28] media: camss: csiphy-3ph: Add Gen2 v1.2.2 two-phase
++ MIPI CSI-2 DPHY init
++
++Add a PHY configuration sequence for the sc7180 which uses a Qualcomm
++Gen 2 version 1.2.2 CSI-2 PHY.
++
++The PHY can be configured as two phase or three phase in C-PHY or D-PHY
++mode. This configuration supports two-phase D-PHY mode.
++
++(cherry picked from commit e1ced6c725035eb1e392440b7eb98503031adca1)
++
++[Jesse: rebased on the per-SoC lane register selection and added
++ CAMSS_7180 to csiphy_is_gen2() so the table is actually used]
++
++Signed-off-by: George Chan <gchan9527@gmail.com>
++Signed-off-by: Jesse <jesse@jjo.ninja>
++---
++ .../qcom/camss/camss-csiphy-3ph-1-0.c         | 125 ++++++++++++++++++
++ drivers/media/platform/qcom/camss/camss.h     |   1 +
++ 2 files changed, 126 insertions(+)
++
++diff --git a/drivers/media/platform/qcom/camss/camss-csiphy-3ph-1-0.c b/drivers/media/platform/qcom/camss/camss-csiphy-3ph-1-0.c
++index a229ba04b..64aabcee3 100644
++--- a/drivers/media/platform/qcom/camss/camss-csiphy-3ph-1-0.c
+++++ b/drivers/media/platform/qcom/camss/camss-csiphy-3ph-1-0.c
++@@ -482,6 +482,126 @@ csiphy_lane_regs lane_regs_qcm2290[] = {
++ 	{0x0664, 0x3f, 0x00, CSIPHY_DEFAULT_PARAMS},
++ };
++ 
+++/* GEN2 1.2.2 2PH */
+++static const struct
+++csiphy_lane_regs lane_regs_sc7180[] = {
+++	{0x0030, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0904, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0910, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0900, 0x0f, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0908, 0x06, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0904, 0x07, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x002c, 0x01, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0034, 0x0f, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0010, 0x50, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x001c, 0x0a, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0014, 0x60, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0028, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x003c, 0xb8, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0000, 0x91, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0004, 0x0c, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0020, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0008, 0x10, 0x00, CSIPHY_SETTLE_CNT_LOWER_BYTE},
+++	{0x0010, 0x52, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0038, 0xfe, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x005c, 0xc0, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0060, 0x0d, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0800, 0x02, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0000, 0x00, 0x00, CSIPHY_DNP_PARAMS},
+++	{0x0730, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0c84, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0c90, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0c80, 0x0f, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0c88, 0x06, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0c84, 0x07, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x072c, 0x01, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0734, 0x0f, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0710, 0x50, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x071c, 0x0a, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0714, 0x60, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0728, 0x04, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x073c, 0xb8, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0700, 0x80, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0704, 0x0c, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0720, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0708, 0x04, 0x00, CSIPHY_SETTLE_CNT_LOWER_BYTE},
+++	{0x070c, 0xff, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0710, 0x52, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0738, 0x1f, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0800, 0x02, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0000, 0x00, 0x00, CSIPHY_DNP_PARAMS},
+++	{0x0000, 0x00, 0x00, CSIPHY_DNP_PARAMS},
+++	{0x0230, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0a04, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0a10, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0a00, 0x0f, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0a08, 0x06, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0a04, 0x07, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x022c, 0x01, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0234, 0x0f, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0210, 0x50, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x021c, 0x0a, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0214, 0x60, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0228, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x023c, 0xb8, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0200, 0x91, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0204, 0x0c, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0220, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0208, 0x04, 0x00, CSIPHY_SETTLE_CNT_LOWER_BYTE},
+++	{0x0210, 0x52, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0238, 0xfe, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x025c, 0xc0, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0260, 0x0d, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0800, 0x02, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0000, 0x00, 0x00, CSIPHY_DNP_PARAMS},
+++	{0x0430, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0b04, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0b10, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0b00, 0x0f, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0b08, 0x06, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0b04, 0x07, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x042c, 0x01, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0434, 0x0f, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0410, 0x50, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x041c, 0x0a, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0414, 0x60, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0428, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x043c, 0xb8, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0400, 0x91, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0404, 0x0c, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0420, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0408, 0x04, 0x00, CSIPHY_SETTLE_CNT_LOWER_BYTE},
+++	{0x0410, 0x52, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0438, 0xfe, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x045c, 0xc0, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0460, 0x0d, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0800, 0x02, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0000, 0x00, 0x00, CSIPHY_DNP_PARAMS},
+++	{0x0630, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0c04, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0c10, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0c00, 0x0f, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0c08, 0x06, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0c04, 0x07, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x062c, 0x01, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0634, 0x0f, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0610, 0x50, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x061c, 0x0a, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0614, 0x60, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0628, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x063c, 0xb8, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0600, 0x91, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0604, 0x0c, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0620, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0608, 0x04, 0x00, CSIPHY_SETTLE_CNT_LOWER_BYTE},
+++	{0x0610, 0x52, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0638, 0xfe, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x065c, 0xc0, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0660, 0x0d, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0800, 0x02, 0x00, CSIPHY_DEFAULT_PARAMS},
+++	{0x0000, 0x00, 0x00, CSIPHY_DNP_PARAMS},
+++};
+++
++ /* GEN2 2.1.2 2PH DPHY mode */
++ static const struct
++ csiphy_lane_regs lane_regs_sm8550[] = {
++@@ -908,6 +1028,7 @@ static bool csiphy_is_gen2(u32 version)
++ 
++ 	switch (version) {
++ 	case CAMSS_2290:
+++	case CAMSS_7180:
++ 	case CAMSS_7280:
++ 	case CAMSS_8250:
++ 	case CAMSS_8280XP:
++@@ -999,6 +1120,10 @@ static int csiphy_init(struct csiphy_device *csiphy)
++ 		regs->lane_regs = &lane_regs_qcm2290[0];
++ 		regs->lane_array_size = ARRAY_SIZE(lane_regs_qcm2290);
++ 		break;
+++	case CAMSS_7180:
+++		regs->lane_regs = &lane_regs_sc7180[0];
+++		regs->lane_array_size = ARRAY_SIZE(lane_regs_sc7180);
+++		break;
++ 	case CAMSS_7280:
++ 	case CAMSS_8250:
++ 		regs->lane_regs = &lane_regs_sm8250[0];
++diff --git a/drivers/media/platform/qcom/camss/camss.h b/drivers/media/platform/qcom/camss/camss.h
++index a70fbc78c..07c0e955f 100644
++--- a/drivers/media/platform/qcom/camss/camss.h
+++++ b/drivers/media/platform/qcom/camss/camss.h
++@@ -79,6 +79,7 @@ enum pm_domain {
++ enum camss_version {
++ 	CAMSS_660,
++ 	CAMSS_2290,
+++	CAMSS_7180,
++ 	CAMSS_7280,
++ 	CAMSS_8x16,
++ 	CAMSS_8x53,
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/0009-media-qcom-camss-Add-sc7180-support.patch b/device/community/linux-postmarketos-qcom-sc7180/0009-media-qcom-camss-Add-sc7180-support.patch
+new file mode 100644
+index 0000000..ecd7ab2
+--- /dev/null
++++ b/device/community/linux-postmarketos-qcom-sc7180/0009-media-qcom-camss-Add-sc7180-support.patch
+@@ -0,0 +1,34 @@
++From 6c8642c9eaba2f4c3699ea502c1469b25ef79085 Mon Sep 17 00:00:00 2001
++From: George Chan <gchan9527@gmail.com>
++Date: Mon, 24 Jun 2024 20:13:14 +0800
++Subject: [PATCH 09/28] media: qcom: camss: Add sc7180 support
++
++Add in functional logic throughout the code to support the sc7180.
++
++Signed-off-by: George Chan <gchan9527@gmail.com>
++(cherry picked from commit 2399afb5f52117950512ab19b310a42a70ef9665)
++Signed-off-by: Jesse <jesse@jjo.ninja>
++---
++ drivers/media/platform/qcom/camss/camss-vfe.c | 2 ++
++ 1 file changed, 2 insertions(+)
++
++diff --git a/drivers/media/platform/qcom/camss/camss-vfe.c b/drivers/media/platform/qcom/camss/camss-vfe.c
++index 20e0d6604..cd2b3dd6a 100644
++--- a/drivers/media/platform/qcom/camss/camss-vfe.c
+++++ b/drivers/media/platform/qcom/camss/camss-vfe.c
++@@ -341,6 +341,7 @@ static u32 vfe_src_pad_code(struct vfe_line *line, u32 sink_code,
++ 		break;
++ 	case CAMSS_660:
++ 	case CAMSS_2290:
+++	case CAMSS_7180:
++ 	case CAMSS_7280:
++ 	case CAMSS_8x96:
++ 	case CAMSS_8250:
++@@ -1989,6 +1990,7 @@ static int vfe_bpl_align(struct vfe_device *vfe)
++ 	int ret = 8;
++ 
++ 	switch (vfe->camss->res->version) {
+++	case CAMSS_7180:
++ 	case CAMSS_7280:
++ 	case CAMSS_8250:
++ 	case CAMSS_8280XP:
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/0010-media-qcom-camss-Add-sc7180-resources.patch b/device/community/linux-postmarketos-qcom-sc7180/0010-media-qcom-camss-Add-sc7180-resources.patch
+new file mode 100644
+index 0000000..dc8c39e
+--- /dev/null
++++ b/device/community/linux-postmarketos-qcom-sc7180/0010-media-qcom-camss-Add-sc7180-resources.patch
+@@ -0,0 +1,312 @@
++From a4ca62e165edbeecdd8258581f968ae0efd8f5d1 Mon Sep 17 00:00:00 2001
++From: George Chan <gchan9527@gmail.com>
++Date: Mon, 24 Jun 2024 20:13:15 +0800
++Subject: [PATCH 10/28] media: qcom: camss: Add sc7180 resources
++
++This commit describes the hardware layout for the sc7180 for the
++following hardware blocks:
++
++- 2 x VFE
++- 1 x VFE Lite
++- 2 x CSID
++- 1 x CSID Lite
++- 4 x CSI PHY
++
++(cherry picked from commit f233d1ba69d224067169ed9d0bec3a2636d8547f)
++
++[Jesse: set the csiphy ids so the four PHYs get distinct entity names,
++ enable the GCC camera HF AXI clock for the VFEs so frames reach memory,
++ drop the removed link_entities field]
++
++Signed-off-by: George Chan <gchan9527@gmail.com>
++Co-developed-by: Jesse <jesse@jjo.ninja>
++Signed-off-by: Jesse <jesse@jjo.ninja>
++---
++ drivers/media/platform/qcom/camss/camss.c | 260 ++++++++++++++++++++++
++ 1 file changed, 260 insertions(+)
++
++diff --git a/drivers/media/platform/qcom/camss/camss.c b/drivers/media/platform/qcom/camss/camss.c
++index c1148f6ad..3eac02d26 100644
++--- a/drivers/media/platform/qcom/camss/camss.c
+++++ b/drivers/media/platform/qcom/camss/camss.c
++@@ -1318,6 +1318,254 @@ static const struct camss_subdev_resources vfe_res_845[] = {
++ 	}
++ };
++ 
+++static const struct camss_subdev_resources csiphy_res_7180[] = {
+++	/* CSIPHY0 */
+++	{
+++		.regulators = {},
+++		.clock = {
+++			"csiphy0",
+++			"csiphy0_timer"
+++		},
+++		.clock_rate = {
+++			{ 150000000, 270000000, 360000000 },
+++			{ 300000000 },
+++		},
+++		.reg = { "csiphy0" },
+++		.interrupt = { "csiphy0" },
+++		.csiphy = {
+++			.id = 0,
+++			.hw_ops = &csiphy_ops_3ph_1_0,
+++			.formats = &csiphy_formats_sdm845
+++		}
+++	},
+++	/* CSIPHY1 */
+++	{
+++		.regulators = {},
+++		.clock = {
+++			"csiphy1",
+++			"csiphy1_timer"
+++		},
+++		.clock_rate = {
+++			{ 150000000, 270000000, 360000000 },
+++			{ 300000000 },
+++		},
+++		.reg = { "csiphy1" },
+++		.interrupt = { "csiphy1" },
+++		.csiphy = {
+++			.id = 1,
+++			.hw_ops = &csiphy_ops_3ph_1_0,
+++			.formats = &csiphy_formats_sdm845
+++		}
+++	},
+++	/* CSIPHY2 */
+++	{
+++		.regulators = {},
+++		.clock = {
+++			"csiphy2",
+++			"csiphy2_timer"
+++		},
+++		.clock_rate = {
+++			{ 150000000, 270000000, 360000000 },
+++			{ 300000000 },
+++		},
+++		.reg = { "csiphy2" },
+++		.interrupt = { "csiphy2" },
+++		.csiphy = {
+++			.id = 2,
+++			.hw_ops = &csiphy_ops_3ph_1_0,
+++			.formats = &csiphy_formats_sdm845
+++		}
+++	},
+++	/* CSIPHY3 */
+++	{
+++		.regulators = {},
+++		.clock = {
+++			"csiphy3",
+++			"csiphy3_timer"
+++		},
+++		.clock_rate = {
+++			{ 150000000, 270000000, 360000000 },
+++			{ 300000000 },
+++		},
+++		.reg = { "csiphy3" },
+++		.interrupt = { "csiphy3" },
+++		.csiphy = {
+++			.id = 3,
+++			.hw_ops = &csiphy_ops_3ph_1_0,
+++			.formats = &csiphy_formats_sdm845
+++		}
+++	}
+++};
+++
+++static const struct camss_subdev_resources csid_res_7180[] = {
+++	/* CSID0 */
+++	{
+++		.regulators = { "vdda-phy", "vdda-pll" },
+++		.clock = {
+++			"soc_ahb",
+++			"vfe0",
+++			"vfe0_cphy_rx",
+++			"csi0"
+++		},
+++		.clock_rate = {
+++			{ 0 },
+++			{ 240000000, 360000000, 432000000, 600000000 },
+++			{ 150000000, 270000000, 360000000 },
+++			{ 150000000, 270000000, 360000000, 480000000 },
+++		},
+++		.reg = { "csid0" },
+++		.interrupt = { "csid0" },
+++		.csid = {
+++			.hw_ops = &csid_ops_gen2,
+++			.parent_dev_ops = &vfe_parent_dev_ops,
+++			.formats = &csid_formats_gen2
+++		}
+++	},
+++	/* CSID1 */
+++	{
+++		.regulators = { "vdda-phy", "vdda-pll" },
+++		.clock = {
+++			"soc_ahb",
+++			"vfe1",
+++			"vfe1_cphy_rx",
+++			"csi1",
+++		},
+++		.clock_rate = {
+++			{ 0 },
+++			{ 240000000, 360000000, 432000000, 600000000 },
+++			{ 150000000, 270000000, 360000000 },
+++			{ 150000000, 270000000, 360000000, 480000000 },
+++		},
+++		.reg = { "csid1" },
+++		.interrupt = { "csid1" },
+++		.csid = {
+++			.hw_ops = &csid_ops_gen2,
+++			.parent_dev_ops = &vfe_parent_dev_ops,
+++			.formats = &csid_formats_gen2
+++		}
+++	},
+++	/* CSID2 */
+++	{
+++		.regulators = { "vdda-phy", "vdda-pll" },
+++		.clock = {
+++			"soc_ahb",
+++			"vfe_lite",
+++			"vfe_lite_cphy_rx",
+++			"csi2",
+++		},
+++		.clock_rate = {
+++			{ 0 },
+++			{ 240000000, 360000000, 432000000, 600000000 },
+++			{ 150000000, 270000000, 360000000 },
+++			{ 150000000, 270000000, 360000000, 480000000 },
+++		},
+++		.reg = { "csid2" },
+++		.interrupt = { "csid2" },
+++		.csid = {
+++			.is_lite = true,
+++			.hw_ops = &csid_ops_gen2,
+++			.parent_dev_ops = &vfe_parent_dev_ops,
+++			.formats = &csid_formats_gen2
+++		}
+++	}
+++};
+++
+++static const struct camss_subdev_resources vfe_res_7180[] = {
+++	/* VFE0 */
+++	{
+++		.regulators = {},
+++		.clock = {
+++			"gcc_camera_axi",
+++			"camnoc_axi",
+++			"cpas_ahb",
+++			"soc_ahb",
+++			"vfe0",
+++			"vfe0_axi",
+++			"csi0",
+++		},
+++		.clock_rate = {
+++			{ 0 },
+++			{ 0 },
+++			{ 0 },
+++			{ 0 },
+++			{ 19200000, 240000000, 360000000, 432000000, 600000000 },
+++			{ 0 },
+++			{ 150000000, 270000000, 360000000, 480000000 },
+++		},
+++		.reg = { "vfe0" },
+++		.interrupt = { "vfe0" },
+++		.vfe = {
+++			.line_num = 4,
+++			.has_pd = true,
+++			.pd_name = "ife0",
+++			.hw_ops = &vfe_ops_170,
+++			.formats_rdi = &vfe_formats_rdi_845,
+++			.formats_pix = &vfe_formats_pix_845
+++		}
+++	},
+++	/* VFE1 */
+++	{
+++		.regulators = {},
+++		.clock = {
+++			"gcc_camera_axi",
+++			"camnoc_axi",
+++			"cpas_ahb",
+++			"soc_ahb",
+++			"vfe1",
+++			"vfe1_axi",
+++			"csi1",
+++		},
+++		.clock_rate = {
+++			{ 0 },
+++			{ 0 },
+++			{ 0 },
+++			{ 0 },
+++			{ 19200000, 240000000, 360000000, 432000000, 600000000 },
+++			{ 0 },
+++			{ 150000000, 270000000, 360000000, 480000000 },
+++		},
+++		.reg = { "vfe1" },
+++		.interrupt = { "vfe1" },
+++		.vfe = {
+++			.line_num = 4,
+++			.has_pd = true,
+++			.pd_name = "ife1",
+++			.hw_ops = &vfe_ops_170,
+++			.formats_rdi = &vfe_formats_rdi_845,
+++			.formats_pix = &vfe_formats_pix_845
+++		}
+++	},
+++	/* VFE-lite */
+++	{
+++		.regulators = {},
+++		.clock = {
+++			"gcc_camera_axi",
+++			"camnoc_axi",
+++			"cpas_ahb",
+++			"soc_ahb",
+++			"vfe_lite",
+++			"csi2",
+++		},
+++		.clock_rate = {
+++			{ 0 },
+++			{ 0 },
+++			{ 0 },
+++			{ 0 },
+++			{ 19200000, 240000000, 360000000, 432000000, 600000000 },
+++			{ 150000000, 270000000, 360000000, 480000000 },
+++		},
+++		.reg = { "vfe_lite" },
+++		.interrupt = { "vfe_lite" },
+++		.vfe = {
+++			.is_lite = true,
+++			.line_num = 4,
+++			.hw_ops = &vfe_ops_170,
+++			.formats_rdi = &vfe_formats_rdi_845,
+++			.formats_pix = &vfe_formats_pix_845
+++		}
+++	}
+++};
+++
++ static const struct camss_subdev_resources csiphy_res_8250[] = {
++ 	/* CSIPHY0 */
++ 	{
++@@ -4396,6 +4644,17 @@ static const struct camss_resources sdm845_resources = {
++ 	.vfe_num = ARRAY_SIZE(vfe_res_845),
++ };
++ 
+++static const struct camss_resources sc7180_resources = {
+++	.version = CAMSS_7180,
+++	.pd_name = "top",
+++	.csiphy_res = csiphy_res_7180,
+++	.csid_res = csid_res_7180,
+++	.vfe_res = vfe_res_7180,
+++	.csiphy_num = ARRAY_SIZE(csiphy_res_7180),
+++	.csid_num = ARRAY_SIZE(csid_res_7180),
+++	.vfe_num = ARRAY_SIZE(vfe_res_7180),
+++};
+++
++ static const struct camss_resources sm8250_resources = {
++ 	.version = CAMSS_8250,
++ 	.pd_name = "top",
++@@ -4471,6 +4730,7 @@ static const struct of_device_id camss_dt_match[] = {
++ 	{ .compatible = "qcom,qcm2290-camss", .data = &qcm2290_resources },
++ 	{ .compatible = "qcom,qcs8300-camss", .data = &qcs8300_resources },
++ 	{ .compatible = "qcom,sa8775p-camss", .data = &sa8775p_resources },
+++	{ .compatible = "qcom,sc7180-camss", .data = &sc7180_resources },
++ 	{ .compatible = "qcom,sc7280-camss", .data = &sc7280_resources },
++ 	{ .compatible = "qcom,sc8280xp-camss", .data = &sc8280xp_resources },
++ 	{ .compatible = "qcom,sdm660-camss", .data = &sdm660_resources },
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/0011-media-qcom-camss-sc7180-Add-interconnect-support.patch b/device/community/linux-postmarketos-qcom-sc7180/0011-media-qcom-camss-sc7180-Add-interconnect-support.patch
+new file mode 100644
+index 0000000..2c85945
+--- /dev/null
++++ b/device/community/linux-postmarketos-qcom-sc7180/0011-media-qcom-camss-sc7180-Add-interconnect-support.patch
+@@ -0,0 +1,62 @@
++From b2b86508b7d68ecef1321d5c07c43eaa074eb4db Mon Sep 17 00:00:00 2001
++From: Jesse <jesse@jjo.ninja>
++Date: Thu, 3 Sep 2026 19:01:52 -0400
++Subject: [PATCH 11/28] media: qcom: camss: sc7180: Add interconnect support
++
++Describe the CAMSS interconnect paths for sc7180 (config AHB path plus
++the HF0/HF1/SF CAMNOC paths) and vote for bandwidth on them like the
++sdm845 and sm8250 resources do, so the camera NoC is actually clocked
++when the VFE writes frames to memory.
++
++Based on a patch by map220v carried on the 99degree/linux "camss"
++branch; rewritten and resubmitted with permission to be sought from the
++original author.
++
++Signed-off-by: Jesse <jesse@jjo.ninja>
++---
++ drivers/media/platform/qcom/camss/camss.c | 25 +++++++++++++++++++++++
++ 1 file changed, 25 insertions(+)
++
++diff --git a/drivers/media/platform/qcom/camss/camss.c b/drivers/media/platform/qcom/camss/camss.c
++index 3eac02d26..f8344fd3e 100644
++--- a/drivers/media/platform/qcom/camss/camss.c
+++++ b/drivers/media/platform/qcom/camss/camss.c
++@@ -1566,6 +1566,29 @@ static const struct camss_subdev_resources vfe_res_7180[] = {
++ 	}
++ };
++ 
+++static const struct resources_icc icc_res_7180[] = {
+++	{
+++		.name = "cam_ahb",
+++		.icc_bw_tbl.avg = 125000,
+++		.icc_bw_tbl.peak = 250000,
+++	},
+++	{
+++		.name = "cam_hf_0_camnoc",
+++		.icc_bw_tbl.avg = 2097152,
+++		.icc_bw_tbl.peak = 2097152,
+++	},
+++	{
+++		.name = "cam_hf_1_camnoc",
+++		.icc_bw_tbl.avg = 2097152,
+++		.icc_bw_tbl.peak = 2097152,
+++	},
+++	{
+++		.name = "cam_sf_camnoc",
+++		.icc_bw_tbl.avg = 2097152,
+++		.icc_bw_tbl.peak = 2097152,
+++	},
+++};
+++
++ static const struct camss_subdev_resources csiphy_res_8250[] = {
++ 	/* CSIPHY0 */
++ 	{
++@@ -4650,6 +4673,8 @@ static const struct camss_resources sc7180_resources = {
++ 	.csiphy_res = csiphy_res_7180,
++ 	.csid_res = csid_res_7180,
++ 	.vfe_res = vfe_res_7180,
+++	.icc_res = icc_res_7180,
+++	.icc_path_num = ARRAY_SIZE(icc_res_7180),
++ 	.csiphy_num = ARRAY_SIZE(csiphy_res_7180),
++ 	.csid_num = ARRAY_SIZE(csid_res_7180),
++ 	.vfe_num = ARRAY_SIZE(vfe_res_7180),
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/0012-media-qcom-camss-sc7180-Request-CSIPHY-vdda-phy-and-.patch b/device/community/linux-postmarketos-qcom-sc7180/0012-media-qcom-camss-sc7180-Request-CSIPHY-vdda-phy-and-.patch
+new file mode 100644
+index 0000000..f15305f
+--- /dev/null
++++ b/device/community/linux-postmarketos-qcom-sc7180/0012-media-qcom-camss-sc7180-Request-CSIPHY-vdda-phy-and-.patch
+@@ -0,0 +1,55 @@
++From e0137c649990c7b1d63acc6e8481da779e689ee8 Mon Sep 17 00:00:00 2001
++From: Jesse <jesse@jjo.ninja>
++Date: Thu, 3 Sep 2026 00:28:39 -0400
++Subject: [PATCH 12/28] media: qcom: camss: sc7180: Request CSIPHY vdda-phy and
++ vdda-pll supplies
++
++The SC7180 CSIPHYs are powered from PMIC LDOs that are not always-on on
++Chromebook boards (pm6150 ldo4 for the 0.9V rail and pm6150l ldo3 for
++the 1.25V PLL rail). Request them the same way sdm845 does so the PHY is
++powered whenever a camera is streaming.
++Signed-off-by: Jesse <jesse@jjo.ninja>
++---
++ drivers/media/platform/qcom/camss/camss.c | 8 ++++----
++ 1 file changed, 4 insertions(+), 4 deletions(-)
++
++diff --git a/drivers/media/platform/qcom/camss/camss.c b/drivers/media/platform/qcom/camss/camss.c
++index f8344fd3e..d48348386 100644
++--- a/drivers/media/platform/qcom/camss/camss.c
+++++ b/drivers/media/platform/qcom/camss/camss.c
++@@ -1321,7 +1321,7 @@ static const struct camss_subdev_resources vfe_res_845[] = {
++ static const struct camss_subdev_resources csiphy_res_7180[] = {
++ 	/* CSIPHY0 */
++ 	{
++-		.regulators = {},
+++		.regulators = { "vdda-phy", "vdda-pll" },
++ 		.clock = {
++ 			"csiphy0",
++ 			"csiphy0_timer"
++@@ -1340,7 +1340,7 @@ static const struct camss_subdev_resources csiphy_res_7180[] = {
++ 	},
++ 	/* CSIPHY1 */
++ 	{
++-		.regulators = {},
+++		.regulators = { "vdda-phy", "vdda-pll" },
++ 		.clock = {
++ 			"csiphy1",
++ 			"csiphy1_timer"
++@@ -1359,7 +1359,7 @@ static const struct camss_subdev_resources csiphy_res_7180[] = {
++ 	},
++ 	/* CSIPHY2 */
++ 	{
++-		.regulators = {},
+++		.regulators = { "vdda-phy", "vdda-pll" },
++ 		.clock = {
++ 			"csiphy2",
++ 			"csiphy2_timer"
++@@ -1378,7 +1378,7 @@ static const struct camss_subdev_resources csiphy_res_7180[] = {
++ 	},
++ 	/* CSIPHY3 */
++ 	{
++-		.regulators = {},
+++		.regulators = { "vdda-phy", "vdda-pll" },
++ 		.clock = {
++ 			"csiphy3",
++ 			"csiphy3_timer"
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/0013-clk-qcom-gcc-sc7180-Skip-halt-check-for-gcc_camera_h.patch b/device/community/linux-postmarketos-qcom-sc7180/0013-clk-qcom-gcc-sc7180-Skip-halt-check-for-gcc_camera_h.patch
+new file mode 100644
+index 0000000..c7b4207
+--- /dev/null
++++ b/device/community/linux-postmarketos-qcom-sc7180/0013-clk-qcom-gcc-sc7180-Skip-halt-check-for-gcc_camera_h.patch
+@@ -0,0 +1,35 @@
++From 499cac48e6652e6bf7ce5f5f283a569a4dfddabc Mon Sep 17 00:00:00 2001
++From: Jesse <jesse@jjo.ninja>
++Date: Thu, 3 Sep 2026 08:46:21 -0400
++Subject: [PATCH 13/28] clk: qcom: gcc-sc7180: Skip halt check for
++ gcc_camera_hf_axi_clk
++
++When the CAMSS driver releases the camera AXI clock after streaming,
++the branch never reports halted:
++
++  gcc_camera_hf_axi_clk status stuck at 'on'
++  WARNING: CPU: 2 PID: 2010 at drivers/clk/qcom/clk-branch.c:88 clk_branch_toggle+0x144/0x194
++  ...
++  camss_disable_clocks+0x40/0x70 [qcom_camss]
++  vfe_put+0x9c/0x104 [qcom_camss]
++
++The same clock on sc7280 already uses BRANCH_HALT_SKIP; do the same
++here.
++Signed-off-by: Jesse <jesse@jjo.ninja>
++---
++ drivers/clk/qcom/gcc-sc7180.c | 2 +-
++ 1 file changed, 1 insertion(+), 1 deletion(-)
++
++diff --git a/drivers/clk/qcom/gcc-sc7180.c b/drivers/clk/qcom/gcc-sc7180.c
++index 4a49ad7a9..beafdbc6c 100644
++--- a/drivers/clk/qcom/gcc-sc7180.c
+++++ b/drivers/clk/qcom/gcc-sc7180.c
++@@ -878,7 +878,7 @@ static struct clk_branch gcc_boot_rom_ahb_clk = {
++ 
++ static struct clk_branch gcc_camera_hf_axi_clk = {
++ 	.halt_reg = 0xb020,
++-	.halt_check = BRANCH_HALT,
+++	.halt_check = BRANCH_HALT_SKIP,
++ 	.clkr = {
++ 		.enable_reg = 0xb020,
++ 		.enable_mask = BIT(0),
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/0014-media-i2c-ov8856-Report-the-active-media-bus-code-fr.patch b/device/community/linux-postmarketos-qcom-sc7180/0014-media-i2c-ov8856-Report-the-active-media-bus-code-fr.patch
+new file mode 100644
+index 0000000..dbfccc9
+--- /dev/null
++++ b/device/community/linux-postmarketos-qcom-sc7180/0014-media-i2c-ov8856-Report-the-active-media-bus-code-fr.patch
+@@ -0,0 +1,44 @@
++From a4fabce947b3232f35b2553f0b3a5be379d15341 Mon Sep 17 00:00:00 2001
++From: Jesse <jesse@jjo.ninja>
++Date: Thu, 3 Sep 2026 08:49:35 -0400
++Subject: [PATCH 14/28] media: i2c: ov8856: Report the active media bus code
++ from get_fmt
++
++ov8856_get_format() calls ov8856_update_pad_format() with whatever
++code the caller left in fmt->format.code. For an unknown (typically
++zero) code that helper falls back to the mode's default code and, as a
++side effect, overwrites cur_mbus_index. With the sensor configured for
++SBGGR10 on a mode whose default is SGRBG10, link validation reads the
++pad format with a zeroed struct, gets SGRBG10 back and fails with
++-EPIPE:
++
++  v4l2_subdev_link_validate_default: media bus code does not match (source 0x0000300a, sink 0x00003007)
++  link was "ov8856 15-0010":0 -> "msm_csiphy1":0
++
++Seed the code from cur_mbus_index so get_fmt is idempotent and returns
++the format that was actually set.
++Signed-off-by: Jesse <jesse@jjo.ninja>
++---
++ drivers/media/i2c/ov8856.c | 6 ++++--
++ 1 file changed, 4 insertions(+), 2 deletions(-)
++
++diff --git a/drivers/media/i2c/ov8856.c b/drivers/media/i2c/ov8856.c
++index dd01e1d51..eb1251d7c 100644
++--- a/drivers/media/i2c/ov8856.c
+++++ b/drivers/media/i2c/ov8856.c
++@@ -2173,11 +2173,13 @@ static int ov8856_get_format(struct v4l2_subdev *sd,
++ 	struct ov8856 *ov8856 = to_ov8856(sd);
++ 
++ 	mutex_lock(&ov8856->mutex);
++-	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY)
+++	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY) {
++ 		fmt->format = *v4l2_subdev_state_get_format(sd_state,
++ 							    fmt->pad);
++-	else
+++	} else {
+++		fmt->format.code = ov8856_mbus_codes[ov8856->cur_mbus_index];
++ 		ov8856_update_pad_format(ov8856, ov8856->cur_mode, &fmt->format);
+++	}
++ 
++ 	mutex_unlock(&ov8856->mutex);
++ 
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/0015-media-i2c-ov8856-Implement-get_selection.patch b/device/community/linux-postmarketos-qcom-sc7180/0015-media-i2c-ov8856-Implement-get_selection.patch
+new file mode 100644
+index 0000000..6ee63f8
+--- /dev/null
++++ b/device/community/linux-postmarketos-qcom-sc7180/0015-media-i2c-ov8856-Implement-get_selection.patch
+@@ -0,0 +1,75 @@
++From c4e2b8165fb92ab6901a288950a00cd72c1760c3 Mon Sep 17 00:00:00 2001
++From: Jesse <jesse@jjo.ninja>
++Date: Thu, 3 Sep 2026 08:49:36 -0400
++Subject: [PATCH 15/28] media: i2c: ov8856: Implement get_selection
++
++libcamera requires V4L2_SEL_TGT_CROP_BOUNDS/CROP_DEFAULT/CROP and
++NATIVE_SIZE on the sensor pad to derive the pixel array properties and
++otherwise warns that the driver needs fixing. Report the 3296x2480
++pixel array with the 3280x2464 active area, like ov5675 does.
++Signed-off-by: Jesse <jesse@jjo.ninja>
++---
++ drivers/media/i2c/ov8856.c | 36 ++++++++++++++++++++++++++++++++++++
++ 1 file changed, 36 insertions(+)
++
++diff --git a/drivers/media/i2c/ov8856.c b/drivers/media/i2c/ov8856.c
++index eb1251d7c..26f4bc9e2 100644
++--- a/drivers/media/i2c/ov8856.c
+++++ b/drivers/media/i2c/ov8856.c
++@@ -20,6 +20,14 @@
++ #define OV8856_REG_VALUE_24BIT		3
++ 
++ #define OV8856_SCLK			144000000ULL
+++/* Pixel array: 3296x2480 total, 3280x2464 active */
+++#define OV8856_NATIVE_WIDTH		3296
+++#define OV8856_NATIVE_HEIGHT		2480
+++#define OV8856_ACTIVE_START_LEFT	8
+++#define OV8856_ACTIVE_START_TOP		8
+++#define OV8856_ACTIVE_WIDTH		3280
+++#define OV8856_ACTIVE_HEIGHT		2464
+++
++ #define OV8856_XVCLK_19_2		19200000
++ #define OV8856_DATA_LANES		4
++ #define OV8856_RGB_DEPTH		10
++@@ -2186,6 +2194,33 @@ static int ov8856_get_format(struct v4l2_subdev *sd,
++ 	return 0;
++ }
++ 
+++static int ov8856_get_selection(struct v4l2_subdev *sd,
+++				struct v4l2_subdev_state *state,
+++				struct v4l2_subdev_selection *sel)
+++{
+++	if (sel->which != V4L2_SUBDEV_FORMAT_ACTIVE)
+++		return -EINVAL;
+++
+++	switch (sel->target) {
+++	case V4L2_SEL_TGT_NATIVE_SIZE:
+++		sel->r.top = 0;
+++		sel->r.left = 0;
+++		sel->r.width = OV8856_NATIVE_WIDTH;
+++		sel->r.height = OV8856_NATIVE_HEIGHT;
+++		return 0;
+++	case V4L2_SEL_TGT_CROP:
+++	case V4L2_SEL_TGT_CROP_DEFAULT:
+++	case V4L2_SEL_TGT_CROP_BOUNDS:
+++		sel->r.top = OV8856_ACTIVE_START_TOP;
+++		sel->r.left = OV8856_ACTIVE_START_LEFT;
+++		sel->r.width = OV8856_ACTIVE_WIDTH;
+++		sel->r.height = OV8856_ACTIVE_HEIGHT;
+++		return 0;
+++	}
+++
+++	return -EINVAL;
+++}
+++
++ static int ov8856_enum_mbus_code(struct v4l2_subdev *sd,
++ 				 struct v4l2_subdev_state *sd_state,
++ 				 struct v4l2_subdev_mbus_code_enum *code)
++@@ -2241,6 +2276,7 @@ static const struct v4l2_subdev_video_ops ov8856_video_ops = {
++ static const struct v4l2_subdev_pad_ops ov8856_pad_ops = {
++ 	.set_fmt = ov8856_set_format,
++ 	.get_fmt = ov8856_get_format,
+++	.get_selection = ov8856_get_selection,
++ 	.enum_mbus_code = ov8856_enum_mbus_code,
++ 	.enum_frame_size = ov8856_enum_frame_size,
++ };
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/0016-media-i2c-ov8856-Don-t-power-off-an-already-suspende.patch b/device/community/linux-postmarketos-qcom-sc7180/0016-media-i2c-ov8856-Don-t-power-off-an-already-suspende.patch
+new file mode 100644
+index 0000000..9e53ddd
+--- /dev/null
++++ b/device/community/linux-postmarketos-qcom-sc7180/0016-media-i2c-ov8856-Don-t-power-off-an-already-suspende.patch
+@@ -0,0 +1,35 @@
++From f36cbda8319cee39274f3f833bca37393d24457f Mon Sep 17 00:00:00 2001
++From: Jesse <jesse@jjo.ninja>
++Date: Thu, 3 Sep 2026 08:55:17 -0400
++Subject: [PATCH 16/28] media: i2c: ov8856: Don't power off an already
++ suspended sensor on remove
++
++ov8856_remove() unconditionally calls ov8856_power_off() even when the
++device is runtime suspended and thus already powered down, which trips
++the regulator core:
++
++  WARNING: CPU: 1 PID: 7583 at drivers/regulator/core.c:3025 _regulator_disable+0x6c/0x2b0
++  ov8856_remove+0x64/0x90 [ov8856]
++
++Only power off when the device is still active, and mark it suspended
++afterwards.
++Signed-off-by: Jesse <jesse@jjo.ninja>
++---
++ drivers/media/i2c/ov8856.c | 4 +++-
++ 1 file changed, 3 insertions(+), 1 deletion(-)
++
++diff --git a/drivers/media/i2c/ov8856.c b/drivers/media/i2c/ov8856.c
++index 26f4bc9e2..e43d2c270 100644
++--- a/drivers/media/i2c/ov8856.c
+++++ b/drivers/media/i2c/ov8856.c
++@@ -2401,7 +2401,9 @@ static void ov8856_remove(struct i2c_client *client)
++ 	pm_runtime_disable(ov8856->dev);
++ 	mutex_destroy(&ov8856->mutex);
++ 
++-	ov8856_power_off(ov8856->dev);
+++	if (!pm_runtime_status_suspended(ov8856->dev))
+++		ov8856_power_off(ov8856->dev);
+++	pm_runtime_set_suspended(ov8856->dev);
++ }
++ 
++ static int ov8856_probe(struct i2c_client *client)
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/0017-media-i2c-ov8856-Register-the-orientation-and-rotati.patch b/device/community/linux-postmarketos-qcom-sc7180/0017-media-i2c-ov8856-Register-the-orientation-and-rotati.patch
+new file mode 100644
+index 0000000..a989a13
+--- /dev/null
++++ b/device/community/linux-postmarketos-qcom-sc7180/0017-media-i2c-ov8856-Register-the-orientation-and-rotati.patch
+@@ -0,0 +1,45 @@
++From c62fe566478aef3de46bffdc0e28aef18b932c96 Mon Sep 17 00:00:00 2001
++From: Jesse <jesse@jjo.ninja>
++Date: Thu, 3 Sep 2026 18:01:35 -0400
++Subject: [PATCH 17/28] media: i2c: ov8856: Register the orientation and
++ rotation controls
++
++Parse the fwnode "orientation" and "rotation" properties and expose
++them as V4L2_CID_CAMERA_ORIENTATION and V4L2_CID_CAMERA_SENSOR_ROTATION
++like most other sensor drivers do. libcamera uses them to tell the user
++which camera is the front or back one; without them the OV8856 on the
++Lenovo IdeaPad Duet 3 shows up as a nameless sensor and applications
++cannot pick the front camera by default.
++Signed-off-by: Jesse <jesse@jjo.ninja>
++---
++ drivers/media/i2c/ov8856.c | 10 ++++++++++
++ 1 file changed, 10 insertions(+)
++
++diff --git a/drivers/media/i2c/ov8856.c b/drivers/media/i2c/ov8856.c
++index e43d2c270..e2ed4bc2e 100644
++--- a/drivers/media/i2c/ov8856.c
+++++ b/drivers/media/i2c/ov8856.c
++@@ -1895,6 +1895,7 @@ static const struct v4l2_ctrl_ops ov8856_ctrl_ops = {
++ 
++ static int ov8856_init_controls(struct ov8856 *ov8856)
++ {
+++	struct v4l2_fwnode_device_properties props;
++ 	struct v4l2_ctrl_handler *ctrl_hdlr;
++ 	s64 exposure_max, h_blank;
++ 	int ret;
++@@ -1964,6 +1965,15 @@ static int ov8856_init_controls(struct ov8856 *ov8856)
++ 		goto err_ctrl_handler_free;
++ 	}
++ 
+++	ret = v4l2_fwnode_device_parse(ov8856->dev, &props);
+++	if (ret)
+++		return ret;
+++
+++	ret = v4l2_ctrl_new_fwnode_properties(ctrl_hdlr, &ov8856_ctrl_ops,
+++					      &props);
+++	if (ret)
+++		return ret;
+++
++ 	ov8856->sd.ctrl_handler = ctrl_hdlr;
++ 
++ 	return 0;
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/0018-dt-bindings-media-i2c-ovti-ov8856-Allow-video-interf.patch b/device/community/linux-postmarketos-qcom-sc7180/0018-dt-bindings-media-i2c-ovti-ov8856-Allow-video-interf.patch
+new file mode 100644
+index 0000000..da97cf8
+--- /dev/null
++++ b/device/community/linux-postmarketos-qcom-sc7180/0018-dt-bindings-media-i2c-ovti-ov8856-Allow-video-interf.patch
+@@ -0,0 +1,39 @@
++From a4cd21102ee42efcf33ac4875a57afc06420ce64 Mon Sep 17 00:00:00 2001
++From: Jesse <jesse@jjo.ninja>
++Date: Thu, 3 Sep 2026 18:26:31 -0400
++Subject: [PATCH 18/28] dt-bindings: media: i2c: ovti,ov8856: Allow
++ video-interface-devices properties
++
++The driver now parses the standard "orientation" and "rotation"
++properties, so reference video-interface-devices.yaml like ov5675 does
++and switch to unevaluatedProperties. Otherwise dt-validate reports:
++
++  camera@10 (ovti,ov8856): 'orientation', 'rotation' do not match any of the regexes: '^pinctrl-[0-9]+$'
++Signed-off-by: Jesse <jesse@jjo.ninja>
++---
++ Documentation/devicetree/bindings/media/i2c/ovti,ov8856.yaml | 5 ++++-
++ 1 file changed, 4 insertions(+), 1 deletion(-)
++
++diff --git a/Documentation/devicetree/bindings/media/i2c/ovti,ov8856.yaml b/Documentation/devicetree/bindings/media/i2c/ovti,ov8856.yaml
++index fa71f2482..a5f41089e 100644
++--- a/Documentation/devicetree/bindings/media/i2c/ovti,ov8856.yaml
+++++ b/Documentation/devicetree/bindings/media/i2c/ovti,ov8856.yaml
++@@ -10,6 +10,9 @@ title: Omnivision OV8856 CMOS Sensor
++ maintainers:
++   - Sakari Ailus <sakari.ailus@linux.intel.com>
++ 
+++allOf:
+++  - $ref: /schemas/media/video-interface-devices.yaml#
+++
++ description: |-
++   The Omnivision OV8856 is a high performance, 1/4-inch, 8 megapixel, CMOS
++   image sensor that delivers 3264x2448 at 30fps. It provides full-frame,
++@@ -94,7 +97,7 @@ required:
++   - reset-gpios
++   - port
++ 
++-additionalProperties: false
+++unevaluatedProperties: false
++ 
++ examples:
++   - |
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/0019-dt-bindings-media-i2c-ovti-ov5675-ovti-ov8856-Allow-.patch b/device/community/linux-postmarketos-qcom-sc7180/0019-dt-bindings-media-i2c-ovti-ov5675-ovti-ov8856-Allow-.patch
+new file mode 100644
+index 0000000..5e0e756
+--- /dev/null
++++ b/device/community/linux-postmarketos-qcom-sc7180/0019-dt-bindings-media-i2c-ovti-ov5675-ovti-ov8856-Allow-.patch
+@@ -0,0 +1,45 @@
++From c689325068eb0830976b060ad40e812dfe2e26c9 Mon Sep 17 00:00:00 2001
++From: Jesse <jesse@jjo.ninja>
++Date: Thu, 3 Sep 2026 18:45:49 -0400
++Subject: [PATCH 19/28] dt-bindings: media: i2c: ovti,ov5675, ovti,ov8856:
++ Allow power-domains
++
++On Qualcomm sc7180 the sensor master clock (CAM_CC_MCLKn_CLK) is only
++functional while the camera subsystem's TITAN_TOP_GDSC power domain is
++on, so boards need to attach the sensor node to that domain. Allow a
++single power-domains entry for both sensors.
++
++Signed-off-by: Jesse <jesse@jjo.ninja>
++---
++ Documentation/devicetree/bindings/media/i2c/ovti,ov5675.yaml | 3 +++
++ Documentation/devicetree/bindings/media/i2c/ovti,ov8856.yaml | 3 +++
++ 2 files changed, 6 insertions(+)
++
++diff --git a/Documentation/devicetree/bindings/media/i2c/ovti,ov5675.yaml b/Documentation/devicetree/bindings/media/i2c/ovti,ov5675.yaml
++index ad0720405..7500d3679 100644
++--- a/Documentation/devicetree/bindings/media/i2c/ovti,ov5675.yaml
+++++ b/Documentation/devicetree/bindings/media/i2c/ovti,ov5675.yaml
++@@ -46,6 +46,9 @@ properties:
++     description:
++       Digital core voltage supply, 1.2 volts.
++ 
+++  power-domains:
+++    maxItems: 1
+++
++   reset-gpios:
++     description:
++       The phandle and specifier for the GPIO that controls sensor reset.
++diff --git a/Documentation/devicetree/bindings/media/i2c/ovti,ov8856.yaml b/Documentation/devicetree/bindings/media/i2c/ovti,ov8856.yaml
++index a5f41089e..28b052d3b 100644
++--- a/Documentation/devicetree/bindings/media/i2c/ovti,ov8856.yaml
+++++ b/Documentation/devicetree/bindings/media/i2c/ovti,ov8856.yaml
++@@ -54,6 +54,9 @@ properties:
++     description:
++       Definition of the regulator used as digital power supply.
++ 
+++  power-domains:
+++    maxItems: 1
+++
++   reset-gpios:
++     description:
++       The phandle and specifier for the GPIO that controls sensor reset.
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/0020-arm64-dts-qcom-sc7180-camss-Add-CAMSS-block-definiti.patch b/device/community/linux-postmarketos-qcom-sc7180/0020-arm64-dts-qcom-sc7180-camss-Add-CAMSS-block-definiti.patch
+new file mode 100644
+index 0000000..84caf2c
+--- /dev/null
++++ b/device/community/linux-postmarketos-qcom-sc7180/0020-arm64-dts-qcom-sc7180-camss-Add-CAMSS-block-definiti.patch
+@@ -0,0 +1,185 @@
++From 1925b6325693b08f228889b3a6f98b8794ab9359 Mon Sep 17 00:00:00 2001
++From: George Chan <gchan9527@gmail.com>
++Date: Mon, 24 Jun 2024 20:13:16 +0800
++Subject: [PATCH 20/28] arm64: dts: qcom: sc7180: camss: Add CAMSS block
++ definition
++
++Introduce camss subsys support to sc7180 family soc.
++
++(cherry picked from commit 148a930cf3d203567002b0d9b15ca8cf9a2236b9)
++
++[Jesse: interconnects added (from map220v's patch), interrupts declared IRQ_TYPE_EDGE_RISING to match the driver's
++ IRQF_TRIGGER_RISING, otherwise a second probe fails with
++ "irq: type mismatch, failed to map hwirq-509"]
++
++Signed-off-by: George Chan <gchan9527@gmail.com>
++Co-developed-by: Jesse <jesse@jjo.ninja>
++Signed-off-by: Jesse <jesse@jjo.ninja>
++---
++ arch/arm64/boot/dts/qcom/sc7180.dtsi | 146 +++++++++++++++++++++++++++
++ 1 file changed, 146 insertions(+)
++
++diff --git a/arch/arm64/boot/dts/qcom/sc7180.dtsi b/arch/arm64/boot/dts/qcom/sc7180.dtsi
++index 892b3d2f1..97622937f 100644
++--- a/arch/arm64/boot/dts/qcom/sc7180.dtsi
+++++ b/arch/arm64/boot/dts/qcom/sc7180.dtsi
++@@ -5,6 +5,7 @@
++  * Copyright (c) 2019-2020, The Linux Foundation. All rights reserved.
++  */
++ 
+++#include <dt-bindings/clock/qcom,camcc-sc7180.h>
++ #include <dt-bindings/clock/qcom,dispcc-sc7180.h>
++ #include <dt-bindings/clock/qcom,dsi-phy-28nm.h>
++ #include <dt-bindings/clock/qcom,gcc-sc7180.h>
++@@ -3191,6 +3192,151 @@ camnoc_virt: interconnect@ac00000 {
++ 			qcom,bcm-voters = <&apps_bcm_voter>;
++ 		};
++ 
+++		camss: camss@acb3000 {
+++			compatible = "qcom,sc7180-camss";
+++
+++			reg = <0 0xacb3000 0 0x1000>,
+++			      <0 0xacba000 0 0x1000>,
+++			      <0 0xacc8000 0 0x1000>,
+++			      <0 0xac65000 0 0x1000>,
+++			      <0 0xac66000 0 0x1000>,
+++			      <0 0xac67000 0 0x1000>,
+++			      <0 0xac68000 0 0x1000>,
+++			      <0 0xacaf000 0 0x4000>,
+++			      <0 0xacb6000 0 0x4000>,
+++			      <0 0xacc4000 0 0x4000>;
+++
+++			reg-names = "csid0",
+++				    "csid1",
+++				    "csid2",
+++				    "csiphy0",
+++				    "csiphy1",
+++				    "csiphy2",
+++				    "csiphy3",
+++				    "vfe0",
+++				    "vfe1",
+++				    "vfe_lite";
+++
+++			clocks = <&camcc CAM_CC_CAMNOC_AXI_CLK>,
+++				 <&camcc CAM_CC_CPAS_AHB_CLK>,
+++				 <&camcc CAM_CC_IFE_0_CSID_CLK>,
+++				 <&camcc CAM_CC_IFE_1_CSID_CLK>,
+++				 <&camcc CAM_CC_IFE_LITE_CSID_CLK>,
+++				 <&camcc CAM_CC_CSIPHY0_CLK>,
+++				 <&camcc CAM_CC_CSI0PHYTIMER_CLK>,
+++				 <&camcc CAM_CC_CSIPHY1_CLK>,
+++				 <&camcc CAM_CC_CSI1PHYTIMER_CLK>,
+++				 <&camcc CAM_CC_CSIPHY2_CLK>,
+++				 <&camcc CAM_CC_CSI2PHYTIMER_CLK>,
+++				 <&camcc CAM_CC_CSIPHY3_CLK>,
+++				 <&camcc CAM_CC_CSI3PHYTIMER_CLK>,
+++				 <&gcc GCC_CAMERA_AHB_CLK>,
+++				 <&gcc GCC_CAMERA_HF_AXI_CLK>,
+++				 <&camcc CAM_CC_SOC_AHB_CLK>,
+++				 <&camcc CAM_CC_IFE_0_AXI_CLK>,
+++				 <&camcc CAM_CC_IFE_0_CLK>,
+++				 <&camcc CAM_CC_IFE_0_CPHY_RX_CLK>,
+++				 <&camcc CAM_CC_IFE_1_AXI_CLK>,
+++				 <&camcc CAM_CC_IFE_1_CLK>,
+++				 <&camcc CAM_CC_IFE_1_CPHY_RX_CLK>,
+++				 <&camcc CAM_CC_IFE_LITE_CLK>,
+++				 <&camcc CAM_CC_IFE_LITE_CPHY_RX_CLK>;
+++
+++			clock-names = "camnoc_axi",
+++				      "cpas_ahb",
+++				      "csi0",
+++				      "csi1",
+++				      "csi2",
+++				      "csiphy0",
+++				      "csiphy0_timer",
+++				      "csiphy1",
+++				      "csiphy1_timer",
+++				      "csiphy2",
+++				      "csiphy2_timer",
+++				      "csiphy3",
+++				      "csiphy3_timer",
+++				      "gcc_camera_ahb",
+++				      "gcc_camera_axi",
+++				      "soc_ahb",
+++				      "vfe0_axi",
+++				      "vfe0",
+++				      "vfe0_cphy_rx",
+++				      "vfe1_axi",
+++				      "vfe1",
+++				      "vfe1_cphy_rx",
+++				      "vfe_lite",
+++				      "vfe_lite_cphy_rx";
+++
+++			interrupts = <GIC_SPI 464 IRQ_TYPE_EDGE_RISING>,
+++				     <GIC_SPI 466 IRQ_TYPE_EDGE_RISING>,
+++				     <GIC_SPI 473 IRQ_TYPE_EDGE_RISING>,
+++				     <GIC_SPI 477 IRQ_TYPE_EDGE_RISING>,
+++				     <GIC_SPI 478 IRQ_TYPE_EDGE_RISING>,
+++				     <GIC_SPI 479 IRQ_TYPE_EDGE_RISING>,
+++				     <GIC_SPI 448 IRQ_TYPE_EDGE_RISING>,
+++				     <GIC_SPI 465 IRQ_TYPE_EDGE_RISING>,
+++				     <GIC_SPI 467 IRQ_TYPE_EDGE_RISING>,
+++				     <GIC_SPI 472 IRQ_TYPE_EDGE_RISING>;
+++
+++			interrupt-names = "csid0",
+++					  "csid1",
+++					  "csid2",
+++					  "csiphy0",
+++					  "csiphy1",
+++					  "csiphy2",
+++					  "csiphy3",
+++					  "vfe0",
+++					  "vfe1",
+++					  "vfe_lite";
+++
+++			iommus = <&apps_smmu 0x820 0x0>,
+++				 <&apps_smmu 0x840 0x0>,
+++				 <&apps_smmu 0x860 0x0>;
+++
+++			interconnects = <&gem_noc MASTER_APPSS_PROC 0
+++					 &config_noc SLAVE_CAMERA_CFG 0>,
+++					<&camnoc_virt MASTER_CAMNOC_HF0_UNCOMP 0
+++					 &camnoc_virt SLAVE_CAMNOC_UNCOMP 0>,
+++					<&camnoc_virt MASTER_CAMNOC_HF1_UNCOMP 0
+++					 &camnoc_virt SLAVE_CAMNOC_UNCOMP 0>,
+++					<&camnoc_virt MASTER_CAMNOC_SF_UNCOMP 0
+++					 &camnoc_virt SLAVE_CAMNOC_UNCOMP 0>;
+++			interconnect-names = "cam_ahb",
+++					     "cam_hf_0_camnoc",
+++					     "cam_hf_1_camnoc",
+++					     "cam_sf_camnoc";
+++
+++			power-domains = <&camcc IFE_0_GDSC>,
+++					<&camcc IFE_1_GDSC>,
+++					<&camcc TITAN_TOP_GDSC>;
+++
+++			power-domain-names = "ife0", "ife1", "top";
+++
+++			status = "disabled";
+++
+++			ports {
+++				#address-cells = <1>;
+++				#size-cells = <0>;
+++
+++				port@0 {
+++					reg = <0>;
+++				};
+++
+++				port@1 {
+++					reg = <1>;
+++				};
+++
+++				port@2 {
+++					reg = <2>;
+++				};
+++
+++				port@3 {
+++					reg = <3>;
+++				};
+++
+++			};
+++		};
+++
++ 		camcc: clock-controller@ad00000 {
++ 			compatible = "qcom,sc7180-camcc";
++ 			reg = <0 0x0ad00000 0 0x10000>;
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/0021-arm64-dts-qcom-sc7180-Add-CCI0-camera-control-interf.patch b/device/community/linux-postmarketos-qcom-sc7180/0021-arm64-dts-qcom-sc7180-Add-CCI0-camera-control-interf.patch
+new file mode 100644
+index 0000000..c772ba6
+--- /dev/null
++++ b/device/community/linux-postmarketos-qcom-sc7180/0021-arm64-dts-qcom-sc7180-Add-CCI0-camera-control-interf.patch
+@@ -0,0 +1,107 @@
++From 806c07646a25e3a3d5d2b9bc487f9229a65e756d Mon Sep 17 00:00:00 2001
++From: Jesse <jesse@jjo.ninja>
++Date: Thu, 3 Sep 2026 00:28:40 -0400
++Subject: [PATCH 21/28] arm64: dts: qcom: sc7180: Add CCI0 camera control
++ interface
++
++Add the first CCI block at 0xac4a000 with its two I2C masters and the
++pinctrl states for the cci_i2c pins (gpio17/18 and gpio19/20). Register
++offsets, interrupt and clock list come from the ChromeOS 5.4 kernel
++device tree; clock names follow the sdm845 CCI binding.
++Signed-off-by: Jesse <jesse@jjo.ninja>
++---
++ arch/arm64/boot/dts/qcom/sc7180.dtsi | 74 ++++++++++++++++++++++++++++
++ 1 file changed, 74 insertions(+)
++
++diff --git a/arch/arm64/boot/dts/qcom/sc7180.dtsi b/arch/arm64/boot/dts/qcom/sc7180.dtsi
++index 97622937f..d0f5a96dc 100644
++--- a/arch/arm64/boot/dts/qcom/sc7180.dtsi
+++++ b/arch/arm64/boot/dts/qcom/sc7180.dtsi
++@@ -1683,6 +1683,34 @@ dp_hot_plug_det: dp-hot-plug-det-state {
++ 				function = "dp_hot";
++ 			};
++ 
+++			cci0_default: cci0-default-state {
+++				pins = "gpio17", "gpio18";
+++				function = "cci_i2c";
+++				drive-strength = <2>;
+++				bias-pull-up;
+++			};
+++
+++			cci0_sleep: cci0-sleep-state {
+++				pins = "gpio17", "gpio18";
+++				function = "cci_i2c";
+++				drive-strength = <2>;
+++				bias-pull-down;
+++			};
+++
+++			cci1_default: cci1-default-state {
+++				pins = "gpio19", "gpio20";
+++				function = "cci_i2c";
+++				drive-strength = <2>;
+++				bias-pull-up;
+++			};
+++
+++			cci1_sleep: cci1-sleep-state {
+++				pins = "gpio19", "gpio20";
+++				function = "cci_i2c";
+++				drive-strength = <2>;
+++				bias-pull-down;
+++			};
+++
++ 			qspi_clk: qspi-clk-state {
++ 				pins = "gpio63";
++ 				function = "qspi_clk";
++@@ -3337,6 +3365,52 @@ port@3 {
++ 			};
++ 		};
++ 
+++		cci: cci@ac4a000 {
+++			compatible = "qcom,sc7180-cci", "qcom,msm8996-cci";
+++			#address-cells = <1>;
+++			#size-cells = <0>;
+++
+++			reg = <0 0x0ac4a000 0 0x1000>;
+++			interrupts = <GIC_SPI 468 IRQ_TYPE_EDGE_RISING>;
+++			power-domains = <&camcc TITAN_TOP_GDSC>;
+++
+++			clocks = <&camcc CAM_CC_CAMNOC_AXI_CLK>,
+++				 <&camcc CAM_CC_SOC_AHB_CLK>,
+++				 <&camcc CAM_CC_SLOW_AHB_CLK_SRC>,
+++				 <&camcc CAM_CC_CPAS_AHB_CLK>,
+++				 <&camcc CAM_CC_CCI_0_CLK>,
+++				 <&camcc CAM_CC_CCI_0_CLK_SRC>;
+++			clock-names = "camnoc_axi",
+++				      "soc_ahb",
+++				      "slow_ahb_src",
+++				      "cpas_ahb",
+++				      "cci",
+++				      "cci_src";
+++
+++			assigned-clocks = <&camcc CAM_CC_CCI_0_CLK>;
+++			assigned-clock-rates = <37500000>;
+++
+++			pinctrl-names = "default", "sleep";
+++			pinctrl-0 = <&cci0_default &cci1_default>;
+++			pinctrl-1 = <&cci0_sleep &cci1_sleep>;
+++
+++			status = "disabled";
+++
+++			cci_i2c0: i2c-bus@0 {
+++				reg = <0>;
+++				clock-frequency = <400000>;
+++				#address-cells = <1>;
+++				#size-cells = <0>;
+++			};
+++
+++			cci_i2c1: i2c-bus@1 {
+++				reg = <1>;
+++				clock-frequency = <400000>;
+++				#address-cells = <1>;
+++				#size-cells = <0>;
+++			};
+++		};
+++
++ 		camcc: clock-controller@ad00000 {
++ 			compatible = "qcom,sc7180-camcc";
++ 			reg = <0 0x0ad00000 0 0x10000>;
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/0022-arm64-dts-qcom-sc7180-trogdor-wormdingler-Add-MIPI-c.patch b/device/community/linux-postmarketos-qcom-sc7180/0022-arm64-dts-qcom-sc7180-trogdor-wormdingler-Add-MIPI-c.patch
+new file mode 100644
+index 0000000..a13afe6
+--- /dev/null
++++ b/device/community/linux-postmarketos-qcom-sc7180/0022-arm64-dts-qcom-sc7180-trogdor-wormdingler-Add-MIPI-c.patch
+@@ -0,0 +1,173 @@
++From 40911ce36f640f1c0b3f56d994a89f6b2b718037 Mon Sep 17 00:00:00 2001
++From: Jesse <jesse@jjo.ninja>
++Date: Thu, 3 Sep 2026 00:28:41 -0400
++Subject: [PATCH 22/28] arm64: dts: qcom: sc7180-trogdor-wormdingler: Add MIPI
++ cameras
++
++Wormdingler (Lenovo IdeaPad Duet 3 Chromebook) has a 5 MP fixed focus
++user-facing camera on CSIPHY0/CCI0 master 0 and an 8 MP autofocus
++world-facing camera on CSIPHY1/CCI0 master 1. Wiring (MCLK0 on gpio13,
++MCLK1 on gpio14, resets on gpio30/gpio29, camera EEPROMs at 0x50/0x58)
++comes from the ChromeOS 5.4 device tree. Sensor part numbers are not
++documented there; ov5675/ov8856 are the initial guess and will be
++corrected after probing.
++Signed-off-by: Jesse <jesse@jjo.ninja>
++---
++ .../dts/qcom/sc7180-trogdor-wormdingler.dtsi  | 147 ++++++++++++++++++
++ 1 file changed, 147 insertions(+)
++
++diff --git a/arch/arm64/boot/dts/qcom/sc7180-trogdor-wormdingler.dtsi b/arch/arm64/boot/dts/qcom/sc7180-trogdor-wormdingler.dtsi
++index 607830869..6e31cfbbc 100644
++--- a/arch/arm64/boot/dts/qcom/sc7180-trogdor-wormdingler.dtsi
+++++ b/arch/arm64/boot/dts/qcom/sc7180-trogdor-wormdingler.dtsi
++@@ -369,3 +369,150 @@ vdd_reset_1800: vdd-reset-1800-state {
++ 		bias-disable;
++ 	};
++ };
+++
+++/* CAMERAS */
+++
+++&camss {
+++	vdda-phy-supply = <&vdda_mipi_csi0_0p9>;
+++	vdda-pll-supply = <&vdda_csi0_1p25>;
+++
+++	status = "okay";
+++
+++	ports {
+++		port@0 {
+++			csiphy0_ep: endpoint {
+++				clock-lanes = <7>;
+++				data-lanes = <0 1>;
+++				remote-endpoint = <&uf_cam_ep>;
+++			};
+++		};
+++
+++		port@1 {
+++			csiphy1_ep: endpoint {
+++				clock-lanes = <7>;
+++				data-lanes = <0 1 2 3>;
+++				remote-endpoint = <&wf_cam_ep>;
+++			};
+++		};
+++	};
+++};
+++
+++&cci {
+++	status = "okay";
+++};
+++
+++/* User-facing (front) camera, 5 MP fixed focus */
+++&cci_i2c0 {
+++	uf_cam: camera@36 {
+++		compatible = "ovti,ov5675";
+++		reg = <0x36>;
+++
+++		power-domains = <&camcc TITAN_TOP_GDSC>;
+++		clocks = <&camcc CAM_CC_MCLK0_CLK>;
+++		assigned-clocks = <&camcc CAM_CC_MCLK0_CLK>;
+++		assigned-clock-rates = <19200000>;
+++
+++		reset-gpios = <&tlmm 30 GPIO_ACTIVE_LOW>;
+++		pinctrl-names = "default";
+++		pinctrl-0 = <&cam_mclk0_default>, <&uf_cam_rst>;
+++
+++		avdd-supply = <&pp2800_uf_cam>;
+++		dovdd-supply = <&pp1800_uf_cam>;
+++		dvdd-supply = <&pp1800_uf_cam>;
+++
+++		orientation = <0>;
+++		rotation = <0>;
+++
+++		port {
+++			uf_cam_ep: endpoint {
+++				data-lanes = <1 2>;
+++				link-frequencies = /bits/ 64 <450000000>;
+++				remote-endpoint = <&csiphy0_ep>;
+++			};
+++		};
+++	};
+++
+++	uf_cam_eeprom: eeprom@50 {
+++		compatible = "atmel,24c64";
+++		reg = <0x50>;
+++		vcc-supply = <&pp1800_uf_cam>;
+++		read-only;
+++	};
+++};
+++
+++/* World-facing (rear) camera, 8 MP autofocus */
+++&cci_i2c1 {
+++	wf_cam: camera@10 {
+++		compatible = "ovti,ov8856";
+++		reg = <0x10>;
+++
+++		power-domains = <&camcc TITAN_TOP_GDSC>;
+++		clocks = <&camcc CAM_CC_MCLK1_CLK>;
+++		clock-names = "xvclk";
+++		clock-frequency = <19200000>;
+++		assigned-clocks = <&camcc CAM_CC_MCLK1_CLK>;
+++		assigned-clock-rates = <19200000>;
+++
+++		reset-gpios = <&tlmm 29 GPIO_ACTIVE_LOW>;
+++		pinctrl-names = "default";
+++		pinctrl-0 = <&cam_mclk1_default>, <&wf_cam_rst>;
+++
+++		avdd-supply = <&pp2800_wf_cam>;
+++		dovdd-supply = <&pp1800_wf_cam>;
+++		dvdd-supply = <&pp1800_wf_cam>;
+++
+++		orientation = <1>;
+++		rotation = <0>;
+++
+++		port {
+++			wf_cam_ep: endpoint {
+++				data-lanes = <1 2 3 4>;
+++				link-frequencies = /bits/ 64 <360000000 180000000>;
+++				remote-endpoint = <&csiphy1_ep>;
+++			};
+++		};
+++	};
+++
+++	wf_cam_eeprom: eeprom@58 {
+++		compatible = "atmel,24c64";
+++		reg = <0x58>;
+++		vcc-supply = <&pp1800_wf_cam>;
+++		read-only;
+++	};
+++
+++	wf_cam_vcm: vcm@c {
+++		compatible = "dongwoon,dw9714";
+++		reg = <0x0c>;
+++		vcc-supply = <&pp2800_wf_cam>;
+++	};
+++};
+++
+++&tlmm {
+++	cam_mclk0_default: cam-mclk0-default-state {
+++		pins = "gpio13";
+++		function = "cam_mclk";
+++		drive-strength = <2>;
+++		bias-disable;
+++	};
+++
+++	cam_mclk1_default: cam-mclk1-default-state {
+++		pins = "gpio14";
+++		function = "cam_mclk";
+++		drive-strength = <2>;
+++		bias-disable;
+++	};
+++
+++	uf_cam_rst: uf-cam-rst-state {
+++		pins = "gpio30";
+++		function = "gpio";
+++		drive-strength = <2>;
+++		bias-disable;
+++	};
+++
+++	wf_cam_rst: wf-cam-rst-state {
+++		pins = "gpio29";
+++		function = "gpio";
+++		drive-strength = <2>;
+++		bias-disable;
+++	};
+++};
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/0023-i2c-qcom-cci-Remove-unused-CCI_RES_MAX-macro-definit.patch b/device/community/linux-postmarketos-qcom-sc7180/0023-i2c-qcom-cci-Remove-unused-CCI_RES_MAX-macro-definit.patch
+new file mode 100644
+index 0000000..0937807
+--- /dev/null
++++ b/device/community/linux-postmarketos-qcom-sc7180/0023-i2c-qcom-cci-Remove-unused-CCI_RES_MAX-macro-definit.patch
+@@ -0,0 +1,33 @@
++From 5c0ab24ad54f00296ebd92c5111a073139f5242f Mon Sep 17 00:00:00 2001
++From: Vladimir Zapolskiy <vladimir.zapolskiy@linaro.org>
++Date: Thu, 26 Mar 2026 18:53:45 +0200
++Subject: [PATCH 23/28] i2c: qcom-cci: Remove unused CCI_RES_MAX macro
++ definition
++
++Trivial change, a never used macro CCI_RES_MAX can be removed from
++the CCI driver.
++
++Signed-off-by: Vladimir Zapolskiy <vladimir.zapolskiy@linaro.org>
++Reviewed-by: Loic Poulain <loic.poulain@oss.qualcomm.com>
++Reviewed-by: Konrad Dybcio <konrad.dybcio@oss.qualcomm.com>
++Signed-off-by: Andi Shyti <andi.shyti@kernel.org>
++Link: https://lore.kernel.org/r/20260326165345.762807-1-vladimir.zapolskiy@linaro.org
++Signed-off-by: Jesse <jesse@jjo.ninja>
++---
++ drivers/i2c/busses/i2c-qcom-cci.c | 3 ---
++ 1 file changed, 3 deletions(-)
++
++diff --git a/drivers/i2c/busses/i2c-qcom-cci.c b/drivers/i2c/busses/i2c-qcom-cci.c
++index 9d83358f2..a5b624867 100644
++--- a/drivers/i2c/busses/i2c-qcom-cci.c
+++++ b/drivers/i2c/busses/i2c-qcom-cci.c
++@@ -71,9 +71,6 @@
++ #define NUM_MASTERS	2
++ #define NUM_QUEUES	2
++ 
++-/* Max number of resources + 1 for a NULL terminator */
++-#define CCI_RES_MAX	6
++-
++ #define CCI_I2C_SET_PARAM	1
++ #define CCI_I2C_REPORT		8
++ #define CCI_I2C_WRITE		9
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/0024-i2c-qcom-cci-Do-not-check-return-value-of-cci_init.patch b/device/community/linux-postmarketos-qcom-sc7180/0024-i2c-qcom-cci-Do-not-check-return-value-of-cci_init.patch
+new file mode 100644
+index 0000000..fd4483f
+--- /dev/null
++++ b/device/community/linux-postmarketos-qcom-sc7180/0024-i2c-qcom-cci-Do-not-check-return-value-of-cci_init.patch
+@@ -0,0 +1,51 @@
++From 8d76e962b832a95150be4f03ef461bc18ce5d373 Mon Sep 17 00:00:00 2001
++From: Vladimir Zapolskiy <vladimir.zapolskiy@linaro.org>
++Date: Sat, 16 May 2026 02:41:19 +0300
++Subject: [PATCH 24/28] i2c: qcom-cci: Do not check return value of cci_init()
++
++The cci_init() function is not supposed to fail, and it never returns
++a non-zero, so it'd make sense to convert its signature to void.
++
++Signed-off-by: Vladimir Zapolskiy <vladimir.zapolskiy@linaro.org>
++Reviewed-by: Loic Poulain <loic.poulain@oss.qualcomm.com>
++Reviewed-by: Konrad Dybcio <konrad.dybcio@oss.qualcomm.com>
++Signed-off-by: Andi Shyti <andi.shyti@kernel.org>
++Link: https://lore.kernel.org/r/20260515234121.1607425-3-vladimir.zapolskiy@linaro.org
++Signed-off-by: Jesse <jesse@jjo.ninja>
++---
++ drivers/i2c/busses/i2c-qcom-cci.c | 8 ++------
++ 1 file changed, 2 insertions(+), 6 deletions(-)
++
++diff --git a/drivers/i2c/busses/i2c-qcom-cci.c b/drivers/i2c/busses/i2c-qcom-cci.c
++index a5b624867..55f4943a2 100644
++--- a/drivers/i2c/busses/i2c-qcom-cci.c
+++++ b/drivers/i2c/busses/i2c-qcom-cci.c
++@@ -243,7 +243,7 @@ static int cci_reset(struct cci *cci)
++ 	return 0;
++ }
++ 
++-static int cci_init(struct cci *cci)
+++static void cci_init(struct cci *cci)
++ {
++ 	u32 val = CCI_IRQ_MASK_0_I2C_M0_RD_DONE |
++ 			CCI_IRQ_MASK_0_I2C_M0_Q0_REPORT |
++@@ -284,8 +284,6 @@ static int cci_init(struct cci *cci)
++ 		val = hw->scl_stretch_en << 8 | hw->trdhld << 4 | hw->tsp;
++ 		writel(val, cci->base + CCI_I2C_Mm_MISC_CTL(i));
++ 	}
++-
++-	return 0;
++ }
++ 
++ static int cci_run_queue(struct cci *cci, u8 master, u8 queue)
++@@ -611,9 +609,7 @@ static int cci_probe(struct platform_device *pdev)
++ 	if (ret < 0)
++ 		goto error;
++ 
++-	ret = cci_init(cci);
++-	if (ret < 0)
++-		goto error;
+++	cci_init(cci);
++ 
++ 	pm_runtime_set_autosuspend_delay(dev, MSEC_PER_SEC);
++ 	pm_runtime_use_autosuspend(dev);
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/0025-i2c-qcom-cci-Move-cci_init-under-cci_reset-function.patch b/device/community/linux-postmarketos-qcom-sc7180/0025-i2c-qcom-cci-Move-cci_init-under-cci_reset-function.patch
+new file mode 100644
+index 0000000..a4a5bbb
+--- /dev/null
++++ b/device/community/linux-postmarketos-qcom-sc7180/0025-i2c-qcom-cci-Move-cci_init-under-cci_reset-function.patch
+@@ -0,0 +1,96 @@
++From 9954bdff2df1dc649d1dd669b3973bc9eaa56143 Mon Sep 17 00:00:00 2001
++From: Vladimir Zapolskiy <vladimir.zapolskiy@linaro.org>
++Date: Sat, 16 May 2026 02:41:20 +0300
++Subject: [PATCH 25/28] i2c: qcom-cci: Move cci_init() under cci_reset()
++ function
++
++On probe or runtime errors cci_reset() is called and it should be coupled
++with cci_init(), instead of doing this on caller's side, embed cci_init()
++directly into the cci_reset() function.
++
++This is a non-functional change, cci_reset() and cci_init() function
++bodies are reordered.
++
++Signed-off-by: Vladimir Zapolskiy <vladimir.zapolskiy@linaro.org>
++Reviewed-by: Loic Poulain <loic.poulain@oss.qualcomm.com>
++Reviewed-by: Konrad Dybcio <konrad.dybcio@oss.qualcomm.com>
++Signed-off-by: Andi Shyti <andi.shyti@kernel.org>
++Link: https://lore.kernel.org/r/20260515234121.1607425-4-vladimir.zapolskiy@linaro.org
++Signed-off-by: Jesse <jesse@jjo.ninja>
++---
++ drivers/i2c/busses/i2c-qcom-cci.c | 41 +++++++++++++++----------------
++ 1 file changed, 20 insertions(+), 21 deletions(-)
++
++diff --git a/drivers/i2c/busses/i2c-qcom-cci.c b/drivers/i2c/busses/i2c-qcom-cci.c
++index 55f4943a2..5c1070cb7 100644
++--- a/drivers/i2c/busses/i2c-qcom-cci.c
+++++ b/drivers/i2c/busses/i2c-qcom-cci.c
++@@ -225,24 +225,6 @@ static int cci_halt(struct cci *cci, u8 master_num)
++ 	return 0;
++ }
++ 
++-static int cci_reset(struct cci *cci)
++-{
++-	/*
++-	 * we reset the whole controller, here and for implicity use
++-	 * master[0].xxx for waiting on it.
++-	 */
++-	reinit_completion(&cci->master[0].irq_complete);
++-	writel(CCI_RESET_CMD_MASK, cci->base + CCI_RESET_CMD);
++-
++-	if (!wait_for_completion_timeout(&cci->master[0].irq_complete,
++-					 CCI_TIMEOUT)) {
++-		dev_err(cci->dev, "CCI reset timeout\n");
++-		return -ETIMEDOUT;
++-	}
++-
++-	return 0;
++-}
++-
++ static void cci_init(struct cci *cci)
++ {
++ 	u32 val = CCI_IRQ_MASK_0_I2C_M0_RD_DONE |
++@@ -286,6 +268,26 @@ static void cci_init(struct cci *cci)
++ 	}
++ }
++ 
+++static int cci_reset(struct cci *cci)
+++{
+++	/*
+++	 * we reset the whole controller, here and for implicity use
+++	 * master[0].xxx for waiting on it.
+++	 */
+++	reinit_completion(&cci->master[0].irq_complete);
+++	writel(CCI_RESET_CMD_MASK, cci->base + CCI_RESET_CMD);
+++
+++	if (!wait_for_completion_timeout(&cci->master[0].irq_complete,
+++					 CCI_TIMEOUT)) {
+++		dev_err(cci->dev, "CCI reset timeout\n");
+++		return -ETIMEDOUT;
+++	}
+++
+++	cci_init(cci);
+++
+++	return 0;
+++}
+++
++ static int cci_run_queue(struct cci *cci, u8 master, u8 queue)
++ {
++ 	u32 val;
++@@ -302,7 +304,6 @@ static int cci_run_queue(struct cci *cci, u8 master, u8 queue)
++ 		dev_err(cci->dev, "master %d queue %d timeout\n",
++ 			master, queue);
++ 		cci_reset(cci);
++-		cci_init(cci);
++ 		return -ETIMEDOUT;
++ 	}
++ 
++@@ -609,8 +610,6 @@ static int cci_probe(struct platform_device *pdev)
++ 	if (ret < 0)
++ 		goto error;
++ 
++-	cci_init(cci);
++-
++ 	pm_runtime_set_autosuspend_delay(dev, MSEC_PER_SEC);
++ 	pm_runtime_use_autosuspend(dev);
++ 	pm_runtime_set_active(dev);
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/0026-i2c-qcom-cci-Remove-overcautious-disable_irq-calls.patch b/device/community/linux-postmarketos-qcom-sc7180/0026-i2c-qcom-cci-Remove-overcautious-disable_irq-calls.patch
+new file mode 100644
+index 0000000..458bf1b
+--- /dev/null
++++ b/device/community/linux-postmarketos-qcom-sc7180/0026-i2c-qcom-cci-Remove-overcautious-disable_irq-calls.patch
+@@ -0,0 +1,50 @@
++From a8157c4def3a8d68c8b48aad32b0f520b86065cf Mon Sep 17 00:00:00 2001
++From: Vladimir Zapolskiy <vladimir.zapolskiy@linaro.org>
++Date: Sat, 16 May 2026 02:41:21 +0300
++Subject: [PATCH 26/28] i2c: qcom-cci: Remove overcautious disable_irq() calls
++
++In cci_probe() the controller's interrupt is requested using a devres
++managed API, and in cci_probe() error path and cci_remove() it'd be
++safe to rely on devres mechanism to free and shutdown the interrupt,
++thus explicit disable_irq() calls can be removed as unnecessary ones.
++
++Signed-off-by: Vladimir Zapolskiy <vladimir.zapolskiy@linaro.org>
++Reviewed-by: Loic Poulain <loic.poulain@oss.qualcomm.com>
++Reviewed-by: Konrad Dybcio <konrad.dybcio@oss.qualcomm.com>
++Signed-off-by: Andi Shyti <andi.shyti@kernel.org>
++Link: https://lore.kernel.org/r/20260515234121.1607425-5-vladimir.zapolskiy@linaro.org
++Signed-off-by: Jesse <jesse@jjo.ninja>
++---
++ drivers/i2c/busses/i2c-qcom-cci.c | 5 +----
++ 1 file changed, 1 insertion(+), 4 deletions(-)
++
++diff --git a/drivers/i2c/busses/i2c-qcom-cci.c b/drivers/i2c/busses/i2c-qcom-cci.c
++index 5c1070cb7..3a9c42a98 100644
++--- a/drivers/i2c/busses/i2c-qcom-cci.c
+++++ b/drivers/i2c/busses/i2c-qcom-cci.c
++@@ -608,7 +608,7 @@ static int cci_probe(struct platform_device *pdev)
++ 
++ 	ret = cci_reset(cci);
++ 	if (ret < 0)
++-		goto error;
+++		goto disable_clocks;
++ 
++ 	pm_runtime_set_autosuspend_delay(dev, MSEC_PER_SEC);
++ 	pm_runtime_use_autosuspend(dev);
++@@ -638,8 +638,6 @@ static int cci_probe(struct platform_device *pdev)
++ 			of_node_put(cci->master[i].adap.dev.of_node);
++ 		}
++ 	}
++-error:
++-	disable_irq(cci->irq);
++ disable_clocks:
++ 	cci_disable_clocks(cci);
++ 
++@@ -659,7 +657,6 @@ static void cci_remove(struct platform_device *pdev)
++ 		}
++ 	}
++ 
++-	disable_irq(cci->irq);
++ 	pm_runtime_disable(&pdev->dev);
++ 	pm_runtime_set_suspended(&pdev->dev);
++ }
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/0027-i2c-qcom-cci-drop-custom-suspend-resume-and-rely-on-.patch b/device/community/linux-postmarketos-qcom-sc7180/0027-i2c-qcom-cci-drop-custom-suspend-resume-and-rely-on-.patch
+new file mode 100644
+index 0000000..e1a5277
+--- /dev/null
++++ b/device/community/linux-postmarketos-qcom-sc7180/0027-i2c-qcom-cci-drop-custom-suspend-resume-and-rely-on-.patch
+@@ -0,0 +1,57 @@
++From f0d46e76092f050fc5855147336e85321cd82703 Mon Sep 17 00:00:00 2001
++From: Wenmeng Liu <wenmeng.liu@oss.qualcomm.com>
++Date: Thu, 25 Jun 2026 17:42:45 +0800
++Subject: [PATCH 27/28] i2c: qcom-cci: drop custom suspend/resume and rely on
++ runtime PM helpers
++
++cci_resume() unconditionally calls cci_resume_runtime() regardless of
++the runtime PM state.
++
++If the device is already runtime-suspended before system suspend,
++the clock is re-enabled while runtime_status remains RPM_SUSPENDED.
++As a result, pm_request_autosuspend() does not arm the timer,
++leaving the clock permanently enabled.
++
++Fixes: e517526195de ("i2c: Add Qualcomm CCI I2C driver")
++Signed-off-by: Wenmeng Liu <wenmeng.liu@oss.qualcomm.com>
++Cc: <stable@vger.kernel.org> # v5.8+
++Reviewed-by: Vladimir Zapolskiy <vladimir.zapolskiy@linaro.org>
++Reviewed-by: Konrad Dybcio <konrad.dybcio@oss.qualcomm.com>
++Reviewed-by: Loic Poulain <loic.poulain@oss.qualcomm.com>
++Signed-off-by: Andi Shyti <andi.shyti@kernel.org>
++Link: https://lore.kernel.org/r/20260625-cci-v1-1-a100cda673ce@oss.qualcomm.com
++Signed-off-by: Jesse <jesse@jjo.ninja>
++---
++ drivers/i2c/busses/i2c-qcom-cci.c | 18 +-----------------
++ 1 file changed, 1 insertion(+), 17 deletions(-)
++
++diff --git a/drivers/i2c/busses/i2c-qcom-cci.c b/drivers/i2c/busses/i2c-qcom-cci.c
++index 3a9c42a98..ac8b247d6 100644
++--- a/drivers/i2c/busses/i2c-qcom-cci.c
+++++ b/drivers/i2c/busses/i2c-qcom-cci.c
++@@ -492,24 +492,8 @@ static int __maybe_unused cci_resume_runtime(struct device *dev)
++ 	return 0;
++ }
++ 
++-static int __maybe_unused cci_suspend(struct device *dev)
++-{
++-	if (!pm_runtime_suspended(dev))
++-		return cci_suspend_runtime(dev);
++-
++-	return 0;
++-}
++-
++-static int __maybe_unused cci_resume(struct device *dev)
++-{
++-	cci_resume_runtime(dev);
++-	pm_request_autosuspend(dev);
++-
++-	return 0;
++-}
++-
++ static const struct dev_pm_ops qcom_cci_pm = {
++-	SET_SYSTEM_SLEEP_PM_OPS(cci_suspend, cci_resume)
+++	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend, pm_runtime_force_resume)
++ 	SET_RUNTIME_PM_OPS(cci_suspend_runtime, cci_resume_runtime, NULL)
++ };
++ 
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/0028-i2c-qcom-cci-fix-autosuspend-cleanup.patch b/device/community/linux-postmarketos-qcom-sc7180/0028-i2c-qcom-cci-fix-autosuspend-cleanup.patch
+new file mode 100644
+index 0000000..753c0a9
+--- /dev/null
++++ b/device/community/linux-postmarketos-qcom-sc7180/0028-i2c-qcom-cci-fix-autosuspend-cleanup.patch
+@@ -0,0 +1,71 @@
++From a5c6e14af164a182af273f4560b2f5f6b3e1dcaa Mon Sep 17 00:00:00 2001
++From: Guangshuo Li <lgs201920130244@gmail.com>
++Date: Wed, 12 Aug 2026 17:44:25 +0800
++Subject: [PATCH 28/28] i2c: qcom-cci: fix autosuspend cleanup
++
++cci_probe() calls pm_runtime_use_autosuspend(), but the remove path
++does not call the matching pm_runtime_dont_use_autosuspend() before
++disabling runtime PM.
++
++If the autosuspend delay is set to a negative value while autosuspend
++is enabled, the runtime PM core increments usage_count to prevent
++runtime suspend. Without undoing the autosuspend setting during
++teardown, this reference is not dropped and usage_count remains
++unbalanced.
++
++Use devm_pm_runtime_set_active_enabled() to manage the runtime PM
++state. Its managed cleanup disables autosuspend and runtime PM and
++restores the suspended state on probe failure and driver removal.
++Remove the now redundant manual runtime PM cleanup.
++
++This issue was found by manual code inspection.
++
++Fixes: e517526195de ("i2c: Add Qualcomm CCI I2C driver")
++Signed-off-by: Guangshuo Li <lgs201920130244@gmail.com>
++Cc: <stable@vger.kernel.org> # v5.8+
++Reviewed-by: Vladimir Zapolskiy <vladimir.zapolskiy@linaro.org>
++Reviewed-by: Loic Poulain <loic.poulain@oss.qualcomm.com>
++Signed-off-by: Andi Shyti <andi.shyti@kernel.org>
++Link: https://patch.msgid.link/20260812094425.3515179-1-lgs201920130244@gmail.com
++Signed-off-by: Jesse <jesse@jjo.ninja>
++---
++ drivers/i2c/busses/i2c-qcom-cci.c | 11 ++++-------
++ 1 file changed, 4 insertions(+), 7 deletions(-)
++
++diff --git a/drivers/i2c/busses/i2c-qcom-cci.c b/drivers/i2c/busses/i2c-qcom-cci.c
++index ac8b247d6..6b597e130 100644
++--- a/drivers/i2c/busses/i2c-qcom-cci.c
+++++ b/drivers/i2c/busses/i2c-qcom-cci.c
++@@ -595,9 +595,11 @@ static int cci_probe(struct platform_device *pdev)
++ 		goto disable_clocks;
++ 
++ 	pm_runtime_set_autosuspend_delay(dev, MSEC_PER_SEC);
+++	ret = devm_pm_runtime_set_active_enabled(dev);
+++	if (ret)
+++		goto disable_clocks;
+++
++ 	pm_runtime_use_autosuspend(dev);
++-	pm_runtime_set_active(dev);
++-	pm_runtime_enable(dev);
++ 
++ 	for (i = 0; i < cci->data->num_masters; i++) {
++ 		if (!cci->master[i].cci)
++@@ -613,8 +615,6 @@ static int cci_probe(struct platform_device *pdev)
++ 	return 0;
++ 
++ error_i2c:
++-	pm_runtime_disable(dev);
++-	pm_runtime_dont_use_autosuspend(dev);
++ 
++ 	for (--i ; i >= 0; i--) {
++ 		if (cci->master[i].cci) {
++@@ -640,9 +640,6 @@ static void cci_remove(struct platform_device *pdev)
++ 			cci_halt(cci, i);
++ 		}
++ 	}
++-
++-	pm_runtime_disable(&pdev->dev);
++-	pm_runtime_set_suspended(&pdev->dev);
++ }
++ 
++ static const struct cci_data cci_v1_data = {
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/APKBUILD b/device/community/linux-postmarketos-qcom-sc7180/APKBUILD
+index 92fd83a..4489876 100644
+--- a/device/community/linux-postmarketos-qcom-sc7180/APKBUILD
++++ b/device/community/linux-postmarketos-qcom-sc7180/APKBUILD
+@@ -3,7 +3,7 @@
+ maintainer="Alicja Michalska <ellyqw@mainlining.org>"
+ pkgname=linux-postmarketos-qcom-sc7180
+ pkgver=6.18.40
+-pkgrel=0
++pkgrel=1
+ pkgdesc="Mainline kernel for Qualcomm Snapdragon 7c devices"
+ arch="aarch64"
+ _carch="arm64"
+@@ -46,6 +46,29 @@ source="
+ 	0003-drm-msm-adreno-Fix-invalid-drvdata-typecast-in-adren.patch
+ 	0004-drm-msm-Always-use-component-model-for-standalone-GP.patch
+ 	0005-drm-msm-Attach-a-driver-to-the-GMU.patch
++	0006-dt-bindings-media-qcom-sc7180-camss-Add-SC7180-CAMSS.patch
++	0007-dt-bindings-i2c-qcom-cci-Document-SC7180-compatible.patch
++	0008-media-camss-csiphy-3ph-Add-Gen2-v1.2.2-two-phase-MIP.patch
++	0009-media-qcom-camss-Add-sc7180-support.patch
++	0010-media-qcom-camss-Add-sc7180-resources.patch
++	0011-media-qcom-camss-sc7180-Add-interconnect-support.patch
++	0012-media-qcom-camss-sc7180-Request-CSIPHY-vdda-phy-and-.patch
++	0013-clk-qcom-gcc-sc7180-Skip-halt-check-for-gcc_camera_h.patch
++	0014-media-i2c-ov8856-Report-the-active-media-bus-code-fr.patch
++	0015-media-i2c-ov8856-Implement-get_selection.patch
++	0016-media-i2c-ov8856-Don-t-power-off-an-already-suspende.patch
++	0017-media-i2c-ov8856-Register-the-orientation-and-rotati.patch
++	0018-dt-bindings-media-i2c-ovti-ov8856-Allow-video-interf.patch
++	0019-dt-bindings-media-i2c-ovti-ov5675-ovti-ov8856-Allow-.patch
++	0020-arm64-dts-qcom-sc7180-camss-Add-CAMSS-block-definiti.patch
++	0021-arm64-dts-qcom-sc7180-Add-CCI0-camera-control-interf.patch
++	0022-arm64-dts-qcom-sc7180-trogdor-wormdingler-Add-MIPI-c.patch
++	0023-i2c-qcom-cci-Remove-unused-CCI_RES_MAX-macro-definit.patch
++	0024-i2c-qcom-cci-Do-not-check-return-value-of-cci_init.patch
++	0025-i2c-qcom-cci-Move-cci_init-under-cci_reset-function.patch
++	0026-i2c-qcom-cci-Remove-overcautious-disable_irq-calls.patch
++	0027-i2c-qcom-cci-drop-custom-suspend-resume-and-rely-on-.patch
++	0028-i2c-qcom-cci-fix-autosuspend-cleanup.patch
+ 	$_config
+ "
+ builddir="$srcdir/linux-${_kernver//_/-}"
+@@ -96,5 +119,28 @@ c79b74b450c00c3da75da59bee5659687f06d3814ebc1c9e6304a89ec756c02caedcb6067897842e
+ 22a416eadfd30a5ffd1d065ce17d7b0bd2285d8ae902401147be8617f26d372f9400551d728769f37398462f0ba0b58cdc4443f44c1d1fb2591c3a9f88432387  0003-drm-msm-adreno-Fix-invalid-drvdata-typecast-in-adren.patch
+ 81f83455054502d04063178761d230e9300562241826f3a7e34605b9f7e6b95271ce060c80d4841f13731d69b076d46813f3ecd945e29b33672b836847a9096c  0004-drm-msm-Always-use-component-model-for-standalone-GP.patch
+ 74d6e28134809ecd74719dd1ee804b92ffd0a8528b555d7bcc44a59064d58010fdc1710938c0af5bbdf08e3dd3792a4fd538548dfa5192dcd35aa25df09364b5  0005-drm-msm-Attach-a-driver-to-the-GMU.patch
+-a1acf2c80bcc1d700782177c13936f4cdd4f67479d0948778642f41746ec5cdacffc1c810acbf058bea4cd1876e6fd4fd2ece27992c246298703b3fbbb416d85  config-postmarketos-qcom-sc7180.aarch64
++3eba212b30908c01fcd6a2b55415e6c94240ce8ccecf48c57ff888666299f3213191072c4aa72f1c6e4486240d080c9901965bd71df0197257a604e164c43565  0006-dt-bindings-media-qcom-sc7180-camss-Add-SC7180-CAMSS.patch
++f464ec2557f7a4360190d81e1d9db7a22e5e49c2080b1a313b4c0abd055251ed0b44098639eff4fe1315219015e2ed1b0d94cc711fff96385d03fe9f7d67eb77  0007-dt-bindings-i2c-qcom-cci-Document-SC7180-compatible.patch
++9b64c2251dd504385cb94b1f8ecce6dd55dff26611f5dc51cbbeb830cea9074ea48cdfb2cad1641ef9c5da8fb0b59347b11508e1052f4eff26d7573e0b930c32  0008-media-camss-csiphy-3ph-Add-Gen2-v1.2.2-two-phase-MIP.patch
++b936ebd84b2a8fb57be55365c5360a1120b1c9841f570ec5df50d35554021de5ffa199aead8cf4d01f1306deb82063f97656232aeae3f265d3a70e69ba54c9c9  0009-media-qcom-camss-Add-sc7180-support.patch
++522c863f8fe8099f8c6fa5d259bb54a3cfda59d24790bbfe159a4130bf692c893d7a1def9527904b3d10f6423d4c480fb3635d686ae87bc3276b463965ed0f19  0010-media-qcom-camss-Add-sc7180-resources.patch
++0eaa2de32f71a8f124917eccd76ac7614c8e61bc85c1ef11038d84b1d3c021f4ba5a4b665b0cb5b9685d231a8ec3e7b359db6c46fae84b0e029427fa77a2aa82  0011-media-qcom-camss-sc7180-Add-interconnect-support.patch
++3b2187c07f0bc4683edd8d88bbbfea9ca5eb5b16ba06fce646d6f41a6db24f48ec8cdf96ff1da15cd82d0b9b0b7a8f1d75ddef197733b084a6b0bf74cbff7fc8  0012-media-qcom-camss-sc7180-Request-CSIPHY-vdda-phy-and-.patch
++39c5cb92804b94c46c922cd15f8243d8c0fe3dac988a0f7d364f4ac0d280d6cf7ebf894b1091d4ad930b396045e9b4738461a42ed9e3d0124b55fa88919332ce  0013-clk-qcom-gcc-sc7180-Skip-halt-check-for-gcc_camera_h.patch
++fa613bd760d8f3b38e5f286f5ee14a2a5a3082157bfff6796c994f12a3199483a02c758bb59a6c90498f4f05b0c2a860b77ccef8fe2cedf21be830bf36671cba  0014-media-i2c-ov8856-Report-the-active-media-bus-code-fr.patch
++d7e9f89f726854989612bb343ab6b0e0d781a59d859f84284a0ddea05528aa1316e07e0518a00e73642c0d11b5f163b42b653ca3aa6964720ce962805561c1ce  0015-media-i2c-ov8856-Implement-get_selection.patch
++c2cd4c17a314bbd0a730d9325a978a87ef174a79295c8ae9604f1b55b60867c7d4a28631c1126eb3bd1004a02f34228fa6c826e4828b25dc38af64541a4e8d8f  0016-media-i2c-ov8856-Don-t-power-off-an-already-suspende.patch
++2f4523903ab9fb86c10c0b785f498bb92bd8ef20dcd4b17725b1c38fc8ef509ee77f07ef8bd783e1db19b8a661097ba1b2538cf5ffda2e9f0c2af347cd629d4f  0017-media-i2c-ov8856-Register-the-orientation-and-rotati.patch
++1730d3df5f07c8f99dc5c8225679299357a4666854823fb1d7b0c320825be3fdd60cfe9e39d0e78f830abbdbedadb164b91d82823538363e160b7eea7453a902  0018-dt-bindings-media-i2c-ovti-ov8856-Allow-video-interf.patch
++a0f84e769461a20b076306c5e01f5e45aea6db89580ad41aad8ef987062167a1a8767b6208bf61a28740dea62824e52203247f61bc0d5aa5c97524ea3a897cae  0019-dt-bindings-media-i2c-ovti-ov5675-ovti-ov8856-Allow-.patch
++88b8f098a92bad43a947655a951f3d522caf9c08434be17be4838f8ef8987c1eddc10bb3de7bb035e1cd9b9eb90187bf2bda545206118ff958c263aa39f3c7a1  0020-arm64-dts-qcom-sc7180-camss-Add-CAMSS-block-definiti.patch
++77a3d59d643f4aa3f242f877511369b57a24c42d4af76012d3a86d0a1b75ebbabb6d7b3c368838da1aa3141e2096273981007ef634d15e24b61b139544b46e80  0021-arm64-dts-qcom-sc7180-Add-CCI0-camera-control-interf.patch
++63e5dbdf00f511bfc12810823f9db61dcddb0e49c6983f72a2961c826dca2fe4862762497e8f45a64674ebde15e7b3d87d92f219db83f0270aa959db27f61b95  0022-arm64-dts-qcom-sc7180-trogdor-wormdingler-Add-MIPI-c.patch
++4ad20375cf9265a3daa9f09269aa377d74d76a842a8888113f86b922639dc276dc462d73f842636779fbdd3b76f9ba860579f4377f3cd8eb376fd4fe7757e769  0023-i2c-qcom-cci-Remove-unused-CCI_RES_MAX-macro-definit.patch
++975293cab2b48aebd3696cfa61ba567d7922489d4f165894f81b09a8c78fcee403fba9e84d6b4db9f1ea97aa9a8df451f773570d4348989c3f2b33410a583b6c  0024-i2c-qcom-cci-Do-not-check-return-value-of-cci_init.patch
++23651bebcab0c8b28e37438bd3f74452dc7bf286962271addfe39966857ac1559e4e231f110cee65c698cfd0a17c4ff7f6768b5b8bb57ee2135418a6ca90bb1f  0025-i2c-qcom-cci-Move-cci_init-under-cci_reset-function.patch
++70e85af772472c0b75fa4513c5138ab26adedc5e65651918d91a244e01f5beb5dd12934b8f9a2eaf76481739650b4d3671950951a80ae2a764c53f5b1f506066  0026-i2c-qcom-cci-Remove-overcautious-disable_irq-calls.patch
++bd858efc675915d357779913ee9b32ce21aaeeb09e1e7769908b011f137641da49011ea7157a76a6687217fc1f49d4cd5ccbbe6cb6c8194bdcb30cdc113c5096  0027-i2c-qcom-cci-drop-custom-suspend-resume-and-rely-on-.patch
++9ce13443f4879cebd2b36220e76947f55f7dc587b99c83c083a156fdb4761467d4684c31268d51f429cd550fd1da56901057afe14ab18fb57aec781e9befa54a  0028-i2c-qcom-cci-fix-autosuspend-cleanup.patch
++408dead9924cb3eebaeb97f9e27e944556d28152efe4f80ccab77ff8e967231c600dc6664dfcc4fdd9e07d46cae5a54723efaf2438092b050ad161675c767b8d  config-postmarketos-qcom-sc7180.aarch64
+ "
+diff --git a/device/community/linux-postmarketos-qcom-sc7180/config-postmarketos-qcom-sc7180.aarch64 b/device/community/linux-postmarketos-qcom-sc7180/config-postmarketos-qcom-sc7180.aarch64
+index e8a296e..06e1515 100644
+--- a/device/community/linux-postmarketos-qcom-sc7180/config-postmarketos-qcom-sc7180.aarch64
++++ b/device/community/linux-postmarketos-qcom-sc7180/config-postmarketos-qcom-sc7180.aarch64
+@@ -4903,7 +4903,7 @@ CONFIG_VIDEO_OV5645=m
+ # CONFIG_VIDEO_OV5647 is not set
+ # CONFIG_VIDEO_OV5648 is not set
+ # CONFIG_VIDEO_OV5670 is not set
+-# CONFIG_VIDEO_OV5675 is not set
++CONFIG_VIDEO_OV5675=m
+ # CONFIG_VIDEO_OV5693 is not set
+ # CONFIG_VIDEO_OV5695 is not set
+ # CONFIG_VIDEO_OV6211 is not set
+@@ -4913,7 +4913,7 @@ CONFIG_VIDEO_OV5645=m
+ # CONFIG_VIDEO_OV7670 is not set
+ # CONFIG_VIDEO_OV772X is not set
+ # CONFIG_VIDEO_OV7740 is not set
+-# CONFIG_VIDEO_OV8856 is not set
++CONFIG_VIDEO_OV8856=m
+ # CONFIG_VIDEO_OV8858 is not set
+ # CONFIG_VIDEO_OV8865 is not set
+ # CONFIG_VIDEO_OV9282 is not set
+@@ -4940,7 +4940,7 @@ CONFIG_VIDEO_OV5645=m
+ CONFIG_VIDEO_CAMERA_LENS=y
+ # CONFIG_VIDEO_AD5820 is not set
+ # CONFIG_VIDEO_AK7375 is not set
+-# CONFIG_VIDEO_DW9714 is not set
++CONFIG_VIDEO_DW9714=m
+ # CONFIG_VIDEO_DW9719 is not set
+ # CONFIG_VIDEO_DW9768 is not set
+ # CONFIG_VIDEO_DW9807_VCM is not set
+-- 
+2.54.0
+

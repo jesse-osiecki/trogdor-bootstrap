@@ -1,0 +1,33 @@
+From 5c0ab24ad54f00296ebd92c5111a073139f5242f Mon Sep 17 00:00:00 2001
+From: Vladimir Zapolskiy <vladimir.zapolskiy@linaro.org>
+Date: Thu, 26 Mar 2026 18:53:45 +0200
+Subject: [PATCH 23/28] i2c: qcom-cci: Remove unused CCI_RES_MAX macro
+ definition
+
+Trivial change, a never used macro CCI_RES_MAX can be removed from
+the CCI driver.
+
+Signed-off-by: Vladimir Zapolskiy <vladimir.zapolskiy@linaro.org>
+Reviewed-by: Loic Poulain <loic.poulain@oss.qualcomm.com>
+Reviewed-by: Konrad Dybcio <konrad.dybcio@oss.qualcomm.com>
+Signed-off-by: Andi Shyti <andi.shyti@kernel.org>
+Link: https://lore.kernel.org/r/20260326165345.762807-1-vladimir.zapolskiy@linaro.org
+Signed-off-by: Jesse <jesse@jjo.ninja>
+---
+ drivers/i2c/busses/i2c-qcom-cci.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-qcom-cci.c b/drivers/i2c/busses/i2c-qcom-cci.c
+index 9d83358f2..a5b624867 100644
+--- a/drivers/i2c/busses/i2c-qcom-cci.c
++++ b/drivers/i2c/busses/i2c-qcom-cci.c
+@@ -71,9 +71,6 @@
+ #define NUM_MASTERS	2
+ #define NUM_QUEUES	2
+ 
+-/* Max number of resources + 1 for a NULL terminator */
+-#define CCI_RES_MAX	6
+-
+ #define CCI_I2C_SET_PARAM	1
+ #define CCI_I2C_REPORT		8
+ #define CCI_I2C_WRITE		9

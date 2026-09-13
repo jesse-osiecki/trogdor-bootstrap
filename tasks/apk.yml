@@ -1,0 +1,13 @@
+---
+# Install a list of packages with apk (ansible-core has no apk module and we
+# avoid needing community.general on a fresh device).
+- name: "apk: check which of {{ apk_packages | length }} packages are missing"
+  ansible.builtin.command: apk info -e {{ apk_packages | join(' ') }}
+  register: apk_present
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: "apk: install missing packages"
+  ansible.builtin.command: apk add {{ (apk_packages | difference(apk_present.stdout_lines)) | join(' ') }}
+  when: apk_packages | difference(apk_present.stdout_lines) | length > 0

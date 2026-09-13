@@ -1,0 +1,45 @@
+From c689325068eb0830976b060ad40e812dfe2e26c9 Mon Sep 17 00:00:00 2001
+From: Jesse <jesse@jjo.ninja>
+Date: Thu, 3 Sep 2026 18:45:49 -0400
+Subject: [PATCH 19/28] dt-bindings: media: i2c: ovti,ov5675, ovti,ov8856:
+ Allow power-domains
+
+On Qualcomm sc7180 the sensor master clock (CAM_CC_MCLKn_CLK) is only
+functional while the camera subsystem's TITAN_TOP_GDSC power domain is
+on, so boards need to attach the sensor node to that domain. Allow a
+single power-domains entry for both sensors.
+
+Signed-off-by: Jesse <jesse@jjo.ninja>
+---
+ Documentation/devicetree/bindings/media/i2c/ovti,ov5675.yaml | 3 +++
+ Documentation/devicetree/bindings/media/i2c/ovti,ov8856.yaml | 3 +++
+ 2 files changed, 6 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/media/i2c/ovti,ov5675.yaml b/Documentation/devicetree/bindings/media/i2c/ovti,ov5675.yaml
+index ad0720405..7500d3679 100644
+--- a/Documentation/devicetree/bindings/media/i2c/ovti,ov5675.yaml
++++ b/Documentation/devicetree/bindings/media/i2c/ovti,ov5675.yaml
+@@ -46,6 +46,9 @@ properties:
+     description:
+       Digital core voltage supply, 1.2 volts.
+ 
++  power-domains:
++    maxItems: 1
++
+   reset-gpios:
+     description:
+       The phandle and specifier for the GPIO that controls sensor reset.
+diff --git a/Documentation/devicetree/bindings/media/i2c/ovti,ov8856.yaml b/Documentation/devicetree/bindings/media/i2c/ovti,ov8856.yaml
+index a5f41089e..28b052d3b 100644
+--- a/Documentation/devicetree/bindings/media/i2c/ovti,ov8856.yaml
++++ b/Documentation/devicetree/bindings/media/i2c/ovti,ov8856.yaml
+@@ -54,6 +54,9 @@ properties:
+     description:
+       Definition of the regulator used as digital power supply.
+ 
++  power-domains:
++    maxItems: 1
++
+   reset-gpios:
+     description:
+       The phandle and specifier for the GPIO that controls sensor reset.

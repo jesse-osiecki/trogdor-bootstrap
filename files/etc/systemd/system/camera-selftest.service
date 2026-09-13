@@ -1,0 +1,12 @@
+[Unit]
+Description=Unattended libcamera capture test (test kernels only)
+ConditionKernelVersion=>=7.0
+After=multi-user.target
+RequiresMountsFor=/boot
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/camera-selftest
+
+[Install]
+WantedBy=multi-user.target

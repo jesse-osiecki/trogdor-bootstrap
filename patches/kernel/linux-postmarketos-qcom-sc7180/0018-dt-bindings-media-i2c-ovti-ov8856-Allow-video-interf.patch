@@ -1,0 +1,39 @@
+From a4cd21102ee42efcf33ac4875a57afc06420ce64 Mon Sep 17 00:00:00 2001
+From: Jesse <jesse@jjo.ninja>
+Date: Thu, 3 Sep 2026 18:26:31 -0400
+Subject: [PATCH 18/28] dt-bindings: media: i2c: ovti,ov8856: Allow
+ video-interface-devices properties
+
+The driver now parses the standard "orientation" and "rotation"
+properties, so reference video-interface-devices.yaml like ov5675 does
+and switch to unevaluatedProperties. Otherwise dt-validate reports:
+
+  camera@10 (ovti,ov8856): 'orientation', 'rotation' do not match any of the regexes: '^pinctrl-[0-9]+$'
+Signed-off-by: Jesse <jesse@jjo.ninja>
+---
+ Documentation/devicetree/bindings/media/i2c/ovti,ov8856.yaml | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/media/i2c/ovti,ov8856.yaml b/Documentation/devicetree/bindings/media/i2c/ovti,ov8856.yaml
+index fa71f2482..a5f41089e 100644
+--- a/Documentation/devicetree/bindings/media/i2c/ovti,ov8856.yaml
++++ b/Documentation/devicetree/bindings/media/i2c/ovti,ov8856.yaml
+@@ -10,6 +10,9 @@ title: Omnivision OV8856 CMOS Sensor
+ maintainers:
+   - Sakari Ailus <sakari.ailus@linux.intel.com>
+ 
++allOf:
++  - $ref: /schemas/media/video-interface-devices.yaml#
++
+ description: |-
+   The Omnivision OV8856 is a high performance, 1/4-inch, 8 megapixel, CMOS
+   image sensor that delivers 3264x2448 at 30fps. It provides full-frame,
+@@ -94,7 +97,7 @@ required:
+   - reset-gpios
+   - port
+ 
+-additionalProperties: false
++unevaluatedProperties: false
+ 
+ examples:
+   - |

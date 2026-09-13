@@ -1,0 +1,21 @@
+# Whole files managed verbatim. Format: <role> <mode> <path>
+# ~ means the device user's home. Files under a home dir are owned by the user,
+# everything else by root. sync.sh pulls these FROM the live system into files/,
+# check.sh diffs them, the roles push them back with these modes.
+base        0755 /usr/lib/systemd/system-sleep/led-sleep-indicator
+base        0644 /etc/sysctl.d/99-zram-tuning.conf
+base        0644 /etc/udev/rules.d/61-cros-ec-accel.rules
+base        0644 /usr/share/libcamera/ipa/simple/ov5675.yaml
+base        0644 /usr/share/libcamera/ipa/simple/ov8856.yaml
+dev         0755 /usr/local/sbin/kernel-deadman
+dev         0755 /usr/local/sbin/kernel-keep
+dev         0755 /usr/local/sbin/dmesg-live
+dev         0755 /usr/local/sbin/camera-selftest
+dev         0755 /usr/local/sbin/cgpt-mark-successful
+dev         0644 /etc/systemd/system/kernel-deadman.service
+dev         0644 /etc/systemd/system/dmesg-live.service
+dev         0644 /etc/systemd/system/camera-selftest.service
+dev         0644 /etc/systemd/system/cgpt-mark-successful.service
+unattended  0755 /etc/mkinitfs/hooks-extra/00-luks-autounlock.sh
+face_unlock 0644 /etc/pam.d/kde-fingerprint
+face_unlock 0755 ~/.local/bin/howdy-add-face.sh

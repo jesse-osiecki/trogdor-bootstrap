@@ -1,0 +1,9 @@
+#%PAM-1.0
+# Face unlock through Howdy, riding in kscreenlocker's non-interactive
+# "fingerprint" slot: Plasma before 6.8 has no dedicated face service.
+# Password authentication is untouched and lives in /etc/pam.d/kde.
+# When Plasma 6.8 lands, move the auth line to /etc/pam.d/kde-face and set
+# Face=true under [Authenticators] in kscreenlockerrc, then restore this
+# file from /etc/howdy/kde-fingerprint.pmos-orig.
+-auth      required    pam_howdy.so
+account    include     base-account

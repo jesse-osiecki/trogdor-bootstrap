@@ -1,0 +1,30 @@
+#!/bin/sh
+# Dead-man switch for test kernels in the pmOS_kernel_b slot (2026-09-09).
+# Runs at boot. Unless someone runs `kernel-keep` within DEADMAN_SECS, the
+# booted slot is demoted (priority 0, successful 0) and the machine reboots,
+# so depthcharge picks the failsafe kernel. Does nothing on an already
+# blessed slot or on any slot other than pmOS_kernel_b.
+set -u
+DEADMAN_SECS=${DEADMAN_SECS:-300}
+for x in $(cat /proc/cmdline); do
+	case "$x" in kern_guid=*) guid="${x#kern_guid=}";; esac
+done
+[ -n "${guid:-}" ] || exit 0
+part=$(findfs PARTUUID="$guid") || exit 0
+disk=$(echo "$part" | sed 's/p[0-9]*$//')
+num=$(echo "$part" | sed 's/.*p//')
+[ "$(cgpt show -i "$num" -l "$disk")" = pmOS_kernel_b ] || exit 0
+if [ "$(cgpt show -i "$num" -S "$disk")" = 1 ]; then
+	echo "slot $part already marked successful; nothing to do"; exit 0
+fi
+echo "kernel $(uname -r) on $part is unproven: run 'sudo kernel-keep' within ${DEADMAN_SECS}s or I reboot to the failsafe"
+wall "TEST KERNEL $(uname -r): run 'sudo kernel-keep' within ${DEADMAN_SECS}s or the machine reboots to the failsafe kernel" 2>/dev/null
+t=0
+while [ "$t" -lt "$DEADMAN_SECS" ]; do
+	[ -e /run/kernel-keep ] && { echo "kept by $(cat /run/kernel-keep)"; exit 0; }
+	sleep 5; t=$((t+5))
+done
+echo "no kernel-keep after ${DEADMAN_SECS}s: demoting $part and rebooting to the failsafe"
+cgpt add -i "$num" -P 0 -S 0 -T 0 "$disk"
+sync
+systemctl reboot

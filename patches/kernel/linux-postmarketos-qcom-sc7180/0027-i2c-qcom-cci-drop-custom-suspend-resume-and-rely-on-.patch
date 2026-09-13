@@ -1,0 +1,57 @@
+From f0d46e76092f050fc5855147336e85321cd82703 Mon Sep 17 00:00:00 2001
+From: Wenmeng Liu <wenmeng.liu@oss.qualcomm.com>
+Date: Thu, 25 Jun 2026 17:42:45 +0800
+Subject: [PATCH 27/28] i2c: qcom-cci: drop custom suspend/resume and rely on
+ runtime PM helpers
+
+cci_resume() unconditionally calls cci_resume_runtime() regardless of
+the runtime PM state.
+
+If the device is already runtime-suspended before system suspend,
+the clock is re-enabled while runtime_status remains RPM_SUSPENDED.
+As a result, pm_request_autosuspend() does not arm the timer,
+leaving the clock permanently enabled.
+
+Fixes: e517526195de ("i2c: Add Qualcomm CCI I2C driver")
+Signed-off-by: Wenmeng Liu <wenmeng.liu@oss.qualcomm.com>
+Cc: <stable@vger.kernel.org> # v5.8+
+Reviewed-by: Vladimir Zapolskiy <vladimir.zapolskiy@linaro.org>
+Reviewed-by: Konrad Dybcio <konrad.dybcio@oss.qualcomm.com>
+Reviewed-by: Loic Poulain <loic.poulain@oss.qualcomm.com>
+Signed-off-by: Andi Shyti <andi.shyti@kernel.org>
+Link: https://lore.kernel.org/r/20260625-cci-v1-1-a100cda673ce@oss.qualcomm.com
+Signed-off-by: Jesse <jesse@jjo.ninja>
+---
+ drivers/i2c/busses/i2c-qcom-cci.c | 18 +-----------------
+ 1 file changed, 1 insertion(+), 17 deletions(-)
+
+diff --git a/drivers/i2c/busses/i2c-qcom-cci.c b/drivers/i2c/busses/i2c-qcom-cci.c
+index 3a9c42a98..ac8b247d6 100644
+--- a/drivers/i2c/busses/i2c-qcom-cci.c
++++ b/drivers/i2c/busses/i2c-qcom-cci.c
+@@ -492,24 +492,8 @@ static int __maybe_unused cci_resume_runtime(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int __maybe_unused cci_suspend(struct device *dev)
+-{
+-	if (!pm_runtime_suspended(dev))
+-		return cci_suspend_runtime(dev);
+-
+-	return 0;
+-}
+-
+-static int __maybe_unused cci_resume(struct device *dev)
+-{
+-	cci_resume_runtime(dev);
+-	pm_request_autosuspend(dev);
+-
+-	return 0;
+-}
+-
+ static const struct dev_pm_ops qcom_cci_pm = {
+-	SET_SYSTEM_SLEEP_PM_OPS(cci_suspend, cci_resume)
++	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend, pm_runtime_force_resume)
+ 	SET_RUNTIME_PM_OPS(cci_suspend_runtime, cci_resume_runtime, NULL)
+ };
+ 

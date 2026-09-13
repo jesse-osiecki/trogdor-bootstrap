@@ -1,0 +1,80 @@
+---
+# Howdy face unlock on the Plasma lock screen, built from source with a
+# PipeWire capture backend (nothing is packaged for Alpine). ~15 min on first
+# run (dlib compile + model download). See ~/code/trogdor-support/TLDR.md §9.
+- name: Howdy build and runtime dependencies
+  ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/apk.yml"
+  vars:
+    apk_packages:
+      - git
+      - build-base
+      - cmake
+      - meson
+      - ninja-build
+      - linux-pam-dev
+      - inih-inireader-dev
+      - libevdev-dev
+      - gettext
+      - gettext-dev
+      - bzip2
+      - curl
+      - python3
+      - python3-dev
+      - py3-pip
+      - py3-numpy
+      - py3-opencv
+      - py3-gobject3
+      - openblas-dev
+      - lapack-dev
+      - gstreamer
+      - gst-plugins-base
+      - gst-plugin-pipewire
+      - pipewire-tools
+
+- name: Build and install Howdy (idempotent; skips when pam_howdy.so exists)
+  ansible.builtin.script: "{{ playbook_dir }}/scripts/build-howdy.sh"
+  args: { creates: /usr/lib/security/pam_howdy.so }
+  environment:
+    HOWDY_UPSTREAM: "{{ howdy_upstream }}"
+    HOWDY_SRC: "{{ howdy_src }}"
+    HOWDY_VENV: "{{ howdy_venv }}"
+    DLIB_VERSION: "{{ dlib_version }}"
+    PATCH_DIR: "{{ playbook_dir }}/patches/howdy"
+
+- name: Howdy config (PipeWire front camera, nod check)
+  ansible.builtin.template:
+    src: config.ini.j2
+    dest: /etc/howdy/config.ini
+    mode: "0644"
+
+- name: Keep the stock kde-fingerprint PAM file for rollback
+  ansible.builtin.copy:
+    src: /etc/pam.d/kde-fingerprint
+    dest: /etc/howdy/kde-fingerprint.pmos-orig
+    remote_src: true
+    force: false
+    mode: "0644"
+
+- name: Managed files (PAM hook, enrollment script)
+  ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/managed_files.yml"
+  vars: { role_name: face_unlock }
+
+- name: '"Howdy: add face" launcher'
+  ansible.builtin.template:
+    src: howdy-add-face.desktop.j2
+    dest: "{{ device_home }}/.local/share/applications/howdy-add-face.desktop"
+    owner: "{{ device_user }}"
+    group: "{{ device_user }}"
+    mode: "0644"
+
+- name: Enrolled face models
+  ansible.builtin.find:
+    paths: /etc/howdy/models
+    patterns: "*.dat"
+  register: howdy_models
+  check_mode: false
+
+- name: Enrollment is manual
+  ansible.builtin.debug:
+    msg: "No face enrolled yet: run `sudo howdy add <label>` (or the 'Howdy: add face' launcher)."
+  when: howdy_models.matched == 0

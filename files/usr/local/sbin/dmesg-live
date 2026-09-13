@@ -1,0 +1,8 @@
+#!/bin/sh
+# Keep a near-live copy of dmesg on the unencrypted /boot so a crash that
+# never reaches the journal still leaves its last lines behind. Test kernels only.
+d=/boot/livelog; mkdir -p "$d"; f="$d/dmesg-$(uname -r).txt"
+while :; do
+	dmesg > "$f.tmp" 2>/dev/null && mv -f "$f.tmp" "$f"; sync -f "$f" 2>/dev/null
+	sleep 0.5
+done

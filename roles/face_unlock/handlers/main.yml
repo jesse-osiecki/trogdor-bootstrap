@@ -1,0 +1,4 @@
+---
+- name: face_unlock files changed
+  ansible.builtin.debug:
+    msg: "Howdy files updated; lock the screen (loginctl lock-session) to test."

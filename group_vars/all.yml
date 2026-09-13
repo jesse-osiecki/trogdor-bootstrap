@@ -1,0 +1,45 @@
+# Defaults for every trogdor device. Override per device in host_vars/<hostname>.yml.
+device_user: jesse
+device_home: "/home/{{ device_user }}"
+emmc_device: /dev/mmcblk1
+luks_partition: "{{ emmc_device }}p3"
+
+# Which optional roles run. base always runs.
+enable_dev: false
+enable_unattended: false
+enable_face_unlock: false
+
+# --- base ---
+# keyd id of the Hammer dock keyboard (NOT the touchpad, which shares 18d1:5057).
+# Find it on a new unit with: sudo keyd monitor -t
+keyd_keyboard_hash: eb4bc35f
+zram_swap_pct: "200"
+# Locally built packages to install from apks/ (empty = skip).
+local_apks:
+  - linux-postmarketos-qcom-sc7180-6.18.40-r1.apk
+  - qmlkonsole-26.04.2-r4.apk
+  - qmlkonsole-lang-26.04.2-r4.apk
+
+# --- dev ---
+git_user_name: Jesse Osiecki
+git_user_email: jesse@jjo.ninja
+abuild_srcdest: "{{ device_home }}/code/qmlkonsole-fix/distfiles"
+abuild_repodest: "{{ device_home }}/code/qmlkonsole-fix/packages"
+pipx_tools: [dtschema, b4]
+
+# --- unattended (insecure) ---
+# Add a keyfile to the LUKS root so the device boots without a passphrase.
+# Needs the current passphrase: run with -e luks_passphrase=... (or set
+# LUKS_PASSPHRASE in the environment for bootstrap.sh).
+unattended_luks: true
+
+# --- face_unlock ---
+howdy_upstream: https://github.com/boltgolt/howdy.git
+howdy_src: /opt/howdy/src
+howdy_venv: /opt/howdy/venv
+dlib_version: "20.0.1"
+# PipeWire node of the front camera: wpctl status / pw-cli ls Node
+howdy_pipewire_target: libcamera_input._base_soc_0_cci_ac4a000_i2c-bus_0_camera_36
+howdy_timeout: 10
+howdy_certainty: "3.5"
+howdy_nod_rule: "nod		5s		faildeadly   min_distance=8"

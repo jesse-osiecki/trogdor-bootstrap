@@ -1,0 +1,26 @@
+#!/bin/sh
+# Unattended camera test for test kernels: capture a few frames from every
+# libcamera camera and leave logs + frames on /boot for the next boot to read.
+rel=$(uname -r); d=/boot/camtest/$rel; mkdir -p "$d"; log="$d/log.txt"
+exec >>"$log" 2>&1
+echo "=== camera-selftest on $rel, $(date)"
+i=0; while [ ! -e /dev/media0 ] && [ $i -lt 60 ]; do sleep 1; i=$((i+1)); done
+echo "--- /dev/media* after ${i}s: $(ls /dev/media* 2>/dev/null)"
+sleep 5
+echo "--- cam -l"; timeout 60 cam -l
+n=$(timeout 60 cam -l 2>/dev/null | grep -c '^[0-9]*: ')
+[ "$n" -gt 0 ] || n=2
+for c in $(seq 1 "$n"); do
+	echo "--- camera $c: 640x480 NV12, 4 frames"
+	if ! timeout 60 cam -c "$c" --capture=4 -s width=640,height=480,pixelformat=NV12 --file="$d/cam$c-#.ppm"; then
+		echo "--- camera $c: retry with default stream, 4 frames"
+		timeout 60 cam -c "$c" --capture=4 --file="$d/cam$c-#.ppm"
+	fi
+	echo "--- camera $c exit=$?"
+	echo "--- camera $c: raw stream (no ISP), 2 frames"
+	timeout 60 cam -c "$c" --capture=2 -s role=raw --file="$d/cam$c-raw-#.bin"
+	echo "--- camera $c raw exit=$?"
+done
+ls -la "$d"
+echo "--- dmesg tail"; dmesg | tail -40
+echo "=== done $(date)"; sync

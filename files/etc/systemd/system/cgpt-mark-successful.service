@@ -1,0 +1,11 @@
+[Unit]
+Description=Mark booted ChromeOS kernel partition as successful
+After=multi-user.target
+ConditionKernelCommandLine=kern_guid
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/cgpt-mark-successful
+
+[Install]
+WantedBy=multi-user.target

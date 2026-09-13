@@ -1,0 +1,114 @@
+---
+- name: Kernel, packaging, camera and firmware toolchain
+  ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/apk.yml"
+  vars:
+    apk_packages:
+      - git
+      - git-email
+      - curl
+      - build-base
+      - clang
+      - lld
+      - llvm
+      - bison
+      - flex
+      - bc
+      - openssl-dev
+      - perl
+      - gmp-dev
+      - mpc1-dev
+      - mpfr-dev
+      - elfutils-dev
+      - ncurses-dev
+      - pahole
+      - linux-headers
+      - musl-dev
+      - xz
+      - zstd
+      - rsync
+      - python3
+      - python3-dev
+      - py3-pip
+      - pipx
+      - swig
+      - alpine-sdk
+      - postmarketos-installkernel
+      - i2c-tools
+      - v4l-utils
+      - libcamera-tools
+      - libcamera-v4l2
+      - gstreamer-tools
+      - pipewire-tools
+      - flashrom
+      - coreboot-tools-cbfstool
+      - neovim
+
+- name: git identity for {{ device_user }}
+  ansible.builtin.command: git config --global {{ item.key }} "{{ item.value }}"
+  loop:
+    - { key: user.name,  value: "{{ git_user_name }}" }
+    - { key: user.email, value: "{{ git_user_email }}" }
+  become_user: "{{ device_user }}"
+  changed_when: false
+
+- name: pipx tools (dtschema, b4)
+  ansible.builtin.command: pipx install {{ item }}
+  args: { creates: "{{ device_home }}/.local/share/pipx/venvs/{{ item }}" }
+  loop: "{{ pipx_tools }}"
+  become_user: "{{ device_user }}"
+
+# abuild: build patched aports natively. See ~/code/INDEX.md 1.4.
+- name: "{{ device_user }} in group abuild (takes effect at next login; use abuild -d until then)"
+  ansible.builtin.user:
+    name: "{{ device_user }}"
+    groups: abuild
+    append: true
+
+- name: abuild signing key (generated per device, never copied)
+  ansible.builtin.command: abuild-keygen -a -n
+  args: { creates: "{{ device_home }}/.abuild/abuild.conf" }
+  become_user: "{{ device_user }}"
+
+- name: Find the generated key
+  ansible.builtin.find:
+    paths: "{{ device_home }}/.abuild"
+    patterns: "*.rsa.pub"
+  register: abuild_pub
+  check_mode: false
+
+- name: Trust the key system-wide
+  ansible.builtin.copy:
+    src: "{{ item.path }}"
+    dest: "/etc/apk/keys/{{ item.path | basename }}"
+    remote_src: true
+    mode: "0644"
+  loop: "{{ abuild_pub.files }}"
+  loop_control: { label: "{{ item.path | basename }}" }
+
+- name: abuild.conf SRCDEST/REPODEST (/var/cache/distfiles is not user-writable)
+  ansible.builtin.lineinfile:
+    path: "{{ device_home }}/.abuild/abuild.conf"
+    regexp: "^{{ item.key }}="
+    line: "{{ item.key }}={{ item.value }}"
+  loop:
+    - { key: SRCDEST,  value: "{{ abuild_srcdest }}" }
+    - { key: REPODEST, value: "{{ abuild_repodest }}" }
+
+# Test-kernel safety: dead-man switch and telemetry. The p4 pmOS_kernel_b slot
+# itself is NOT created here (destructive repartition): run
+# scripts/make-kernel-b-partition.sh by hand, see ~/code/INDEX.md 1.10.
+- name: Managed files (test-kernel scripts and units)
+  ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/managed_files.yml"
+  vars: { role_name: dev }
+
+- name: Test-kernel units enabled (deadman, telemetry); auto-bless disabled
+  ansible.builtin.systemd:
+    name: "{{ item.name }}"
+    enabled: "{{ item.enabled }}"
+    daemon_reload: true
+  loop:
+    - { name: kernel-deadman.service,       enabled: true }
+    - { name: dmesg-live.service,           enabled: true }
+    - { name: camera-selftest.service,      enabled: true }
+    - { name: cgpt-mark-successful.service, enabled: false }
+  loop_control: { label: "{{ item.name }}" }
