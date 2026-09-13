@@ -1,7 +1,7 @@
 From 71d5b7fbf8136e91a0f9a2674f3e2ef58a9db791 Mon Sep 17 00:00:00 2001
 From: Jesse Osiecki <jesse@jjo.ninja>
 Date: Sun, 13 Sep 2026 12:59:13 -0400
-Subject: [PATCH 2/3] Add a configurable HOG detection threshold
+Subject: [PATCH 2/4] Add a configurable HOG detection threshold
 
 dlib's HOG detector only reports faces scoring above 0. A face that is
 backlit, in shadow or seen from below (tablet on the lap, window behind
