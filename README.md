@@ -12,7 +12,8 @@ apk add git          # the only thing you need by hand
 git clone <this repo> ~/code/trogdor-bootstrap
 cd ~/code/trogdor-bootstrap
 # add the device to inventory/hosts.yml and create inventory/host_vars/<hostname>.yml
-./bootstrap.sh       # installs bash + ansible-core on first run, then applies site.yml
+./bootstrap.sh --check --diff   # dry run first: what would change
+./bootstrap.sh                  # installs bash + ansible-core on first run, then applies site.yml
 ```
 
 `bootstrap.sh` is POSIX sh so it runs under busybox ash. It uses sudo, asking for the
@@ -23,9 +24,9 @@ so re-running is always safe. It needs only `ansible-core` (no collections).
 
 | Role | On by default | What it does |
 |---|---|---|
-| `base` | yes | bash, keyd touchpad fix (line edit), LED sleep hook, zram tuning, libcamera tuning files, local apks (camera kernel, patched qmlkonsole) |
+| `base` | yes | bash, keyd touchpad fix (line edit), LED sleep hook, accelerometer udev rule (auto-rotation), zram tuning, libcamera tuning files, local apks (camera kernel, patched qmlkonsole) |
 | `dev` | no | kernel/packaging toolchain, pipx tools, git identity, abuild key + config, test-kernel dead-man switch and telemetry units |
-| `unattended` | no | **insecure**: passwordless sudo, lock screen off, LUKS keyfile in the initramfs |
+| `unattended` | no | **insecure**: passwordless sudo, lock screen off, LUKS keyfile in the initramfs (`LUKS_PASSPHRASE=... ./bootstrap.sh --tags unattended` to enrol the key) |
 | `face_unlock` | no | Howdy built from source with the PipeWire backend, config, PAM hook, enrollment launcher |
 
 Switch roles on per device in `inventory/host_vars/<hostname>.yml` (`enable_dev: true` etc.)
@@ -41,6 +42,7 @@ and the Claude Code auto-resume entry (session-specific).
 ```
 manifest.txt        whole files managed verbatim: <role> <mode> <path>
 files/              mirror of those paths, pulled from the live system by sync.sh
+                    (~ in the manifest becomes files/HOME/, owned by device_user on the device)
 patches/kernel/     pmaports package dir + format-patch of branch wormdingler-camera
 patches/howdy/      format-patch of ~/code/howdy branch pmos-pipewire (+ BASE commit)
 patches/qmlkonsole/ the aport (APKBUILD + patches) from ~/code/qmlkonsole-fix
@@ -57,7 +59,7 @@ The rule: edit in the working tree or in this repo, apply with `bootstrap.sh`, n
 - After changing a patch branch or a system file: `./sync.sh`, then `git diff` shows exactly what
   moved. Commit it.
 - To see whether the tablet still matches the repo: `./check.sh` (files, line edits, `apk audit`,
-  unmanaged files in the directories we own). `./check.sh --ansible` adds a full
+  unmanaged files in the directories we own; the audit is complete only with passwordless sudo). `./check.sh --ansible` adds a full
   `ansible-playbook --check --diff`, which also covers templates, packages and units.
 - Adding a new whole file: put its path in `manifest.txt` under the right role, run `./sync.sh`.
   Adding a value that differs between devices: `group_vars/all.yml` default + template.
@@ -71,7 +73,7 @@ private key, the LUKS keyfile, `/etc/howdy/models/*`, Claude credentials.
 ## Kernel
 
 `patches/kernel/linux-postmarketos-qcom-sc7180/` is the complete pmaports package directory
-(APKBUILD, config, 23 patches) from branch `wormdingler-camera`; `patches/kernel/pmaports/` is the
+(APKBUILD, config, 28 patches of which 23 come from branch `wormdingler-camera`); `patches/kernel/pmaports/` is the
 same as a patch against pmaports `main` (base commit in `BASE`). To rebuild on a device with the
 `dev` role: apply the patch to a pmaports checkout, `cd` into the package directory,
 `abuild checksum && abuild -d` (see `~/code/INDEX.md` 1.4 for the abuild gotchas), then drop the
