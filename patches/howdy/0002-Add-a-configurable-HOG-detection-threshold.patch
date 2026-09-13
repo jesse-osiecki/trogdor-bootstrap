@@ -1,0 +1,174 @@
+From 71d5b7fbf8136e91a0f9a2674f3e2ef58a9db791 Mon Sep 17 00:00:00 2001
+From: Jesse Osiecki <jesse@jjo.ninja>
+Date: Sun, 13 Sep 2026 12:59:13 -0400
+Subject: [PATCH] Add a configurable HOG detection threshold
+
+dlib's HOG detector only reports faces scoring above 0. A face that is
+backlit, in shadow or seen from below (tablet on the lap, window behind
+the user) scores between -1 and 0 and is never handed to the recognition
+model, so compare, add and the nod stamp all report no face at all.
+
+Add detector.py with a thin wrapper around detector.run() that takes the
+cutoff from a new [video] detection_threshold option (default 0, dlib's
+behaviour) and use it everywhere a detector is built. The CNN path is
+unchanged; the recognition certainty still decides whether the face is
+the user's.
+---
+ howdy/src/cli/add.py  |  6 ++----
+ howdy/src/cli/test.py |  9 ++-------
+ howdy/src/compare.py  |  8 +++-----
+ howdy/src/config.ini  |  7 +++++++
+ howdy/src/detector.py | 33 +++++++++++++++++++++++++++++++++
+ howdy/src/meson.build |  1 +
+ 6 files changed, 48 insertions(+), 16 deletions(-)
+ create mode 100644 howdy/src/detector.py
+
+diff --git a/howdy/src/cli/add.py b/howdy/src/cli/add.py
+index 9a2c9a0..5b18093 100644
+--- a/howdy/src/cli/add.py
++++ b/howdy/src/cli/add.py
+@@ -9,6 +9,7 @@ import configparser
+ import builtins
+ import numpy as np
+ import paths_factory
++from detector import load_face_detector
+ 
+ from recorders.video_capture import VideoCapture
+ from i18n import _
+@@ -39,10 +40,7 @@ config = configparser.ConfigParser()
+ config.read(paths_factory.config_file_path())
+ 
+ use_cnn = config.getboolean("core", "use_cnn", fallback=False)
+-if use_cnn:
+-	face_detector = dlib.cnn_face_detection_model_v1(paths_factory.mmod_human_face_detector_path())
+-else:
+-	face_detector = dlib.get_frontal_face_detector()
++face_detector = load_face_detector(config)
+ 
+ pose_predictor = dlib.shape_predictor(paths_factory.shape_predictor_5_face_landmarks_path())
+ face_encoder = dlib.face_recognition_model_v1(paths_factory.dlib_face_recognition_resnet_model_v1_path())
+diff --git a/howdy/src/cli/test.py b/howdy/src/cli/test.py
+index f18c4eb..57a7f95 100644
+--- a/howdy/src/cli/test.py
++++ b/howdy/src/cli/test.py
+@@ -11,6 +11,7 @@ import dlib
+ import cv2
+ import numpy as np
+ import paths_factory
++from detector import load_face_detector
+ 
+ from i18n import _
+ from recorders.video_capture import VideoCapture
+@@ -54,13 +55,7 @@ def print_text(line_number, text):
+ 
+ 
+ use_cnn = config.getboolean('core', 'use_cnn', fallback=False)
+-
+-if use_cnn:
+-	face_detector = dlib.cnn_face_detection_model_v1(
+-		paths_factory.mmod_human_face_detector_path()
+-	)
+-else:
+-	face_detector = dlib.get_frontal_face_detector()
++face_detector = load_face_detector(config)
+ 
+ pose_predictor = dlib.shape_predictor(paths_factory.shape_predictor_5_face_landmarks_path())
+ face_encoder = dlib.face_recognition_model_v1(paths_factory.dlib_face_recognition_resnet_model_v1_path())
+diff --git a/howdy/src/compare.py b/howdy/src/compare.py
+index 35e85fb..666fb8b 100644
+--- a/howdy/src/compare.py
++++ b/howdy/src/compare.py
+@@ -23,6 +23,7 @@ import snapshot
+ import numpy as np
+ import _thread as thread
+ import paths_factory
++from detector import load_face_detector
+ from recorders.video_capture import VideoCapture
+ from i18n import _
+ 
+@@ -51,11 +52,8 @@ def init_detector(lock):
+ 		lock.release()
+ 		exit(1)
+ 
+-	# Use the CNN detector if enabled
+-	if use_cnn:
+-		face_detector = dlib.cnn_face_detection_model_v1(paths_factory.mmod_human_face_detector_path())
+-	else:
+-		face_detector = dlib.get_frontal_face_detector()
++	# CNN or HOG detector as configured
++	face_detector = load_face_detector(config)
+ 
+ 	# Start the others regardless
+ 	pose_predictor = dlib.shape_predictor(paths_factory.shape_predictor_5_face_landmarks_path())
+diff --git a/howdy/src/config.ini b/howdy/src/config.ini
+index 3cab435..2b76f27 100644
+--- a/howdy/src/config.ini
++++ b/howdy/src/config.ini
+@@ -63,6 +63,13 @@ frame_width = -1
+ frame_height = -1
+ 
+ # Because of flashing IR emitters, some frames can be completely unlit
++# Minimum score for the HOG face detector (ignored when use_cnn is true)
++# 0 is dlib's default; negative values (down to about -1) also accept faces
++# that are backlit, in shadow or seen from a low angle. The face still has
++# to match the model with the certainty above, so this only costs CPU time
++# on frames without a face
++detection_threshold = 0
++
+ # Skip the frame if the lowest 1/8 of the histogram is above this percentage
+ # of the total
+ # The lower this setting is, the more dark frames are ignored
+diff --git a/howdy/src/detector.py b/howdy/src/detector.py
+new file mode 100644
+index 0000000..49b2270
+--- /dev/null
++++ b/howdy/src/detector.py
+@@ -0,0 +1,33 @@
++# Face detector construction shared by compare.py, the CLI and the rubber
++# stamps, so every path applies the same configuration.
++
++import dlib
++import paths_factory
++
++
++class hog_face_detector:
++	"""
++	dlib's HOG frontal face detector with a configurable score threshold.
++
++	Called as a plain detector it only returns faces scoring above 0. A face
++	that is backlit, in shadow or seen from below often scores between -1 and
++	0 while still being perfectly usable: the landmarks land and the
++	recognition model still has the final say on whether it is the user.
++	detection_threshold in the [video] section moves that cutoff; 0 keeps
++	dlib's default.
++	"""
++
++	def __init__(self, threshold=0.0):
++		self.detector = dlib.get_frontal_face_detector()
++		self.threshold = float(threshold)
++
++	def __call__(self, image, upsample_num_times=0):
++		rects, _scores, _idx = self.detector.run(image, upsample_num_times, self.threshold)
++		return rects
++
++
++def load_face_detector(config):
++	"""Build the detector selected by the config (CNN or HOG)"""
++	if config.getboolean("core", "use_cnn", fallback=False):
++		return dlib.cnn_face_detection_model_v1(paths_factory.mmod_human_face_detector_path())
++	return hog_face_detector(config.getfloat("video", "detection_threshold", fallback=0.0))
+diff --git a/howdy/src/meson.build b/howdy/src/meson.build
+index 2a88ab3..12efbe9 100644
+--- a/howdy/src/meson.build
++++ b/howdy/src/meson.build
+@@ -29,6 +29,7 @@ py_sources = [
+     'cli/test.py',
+     'cli.py',
+     'compare.py',
++    'detector.py',
+     'i18n.py',
+     'paths_factory.py',
+     'recorders/__init__.py',
+-- 
+2.54.0
+
