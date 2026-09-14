@@ -1,0 +1,24 @@
+#!/bin/sh
+# Howdy's python. pam_howdy and the howdy CLI run compare.py/cli.py through
+# this instead of the venv python directly: it raises the backlight to
+# maximum while the camera looks for a face (the lock screen wallpaper is
+# plain white for the same reason) and puts it back when the script ends,
+# also when pam_howdy SIGTERMs it because the password was typed instead.
+PY=/opt/howdy/venv/bin/python3
+BL=/sys/class/backlight/backlight
+
+[ -w "$BL/brightness" ] || exec "$PY" "$@"
+
+old=$(cat "$BL/brightness")
+cat "$BL/max_brightness" > "$BL/brightness"
+
+"$PY" "$@" &
+pid=$!
+trap 'kill -TERM "$pid" 2>/dev/null' TERM INT HUP
+wait "$pid"
+rc=$?
+# a trapped signal interrupts the first wait; collect the real status
+[ "$rc" -gt 128 ] && { wait "$pid"; rc=$?; }
+
+echo "$old" > "$BL/brightness"
+exit "$rc"

@@ -8,6 +8,8 @@ set -eu
 : "${HOWDY_VENV:=/opt/howdy/venv}"
 : "${DLIB_VERSION:=20.0.1}"
 : "${PATCH_DIR:=$(dirname "$0")/../patches/howdy}"
+# Wrapper that raises the backlight while compare.py runs (files/usr/local/bin)
+: "${HOWDY_PYTHON:=/usr/local/bin/howdy-python}"
 BASE=$(cat "$PATCH_DIR/BASE")
 
 echo "==> dlib $DLIB_VERSION in $HOWDY_VENV (about 10 minutes)"
@@ -31,7 +33,7 @@ fi
 echo "==> meson build + install"
 cd "$HOWDY_SRC/howdy"
 meson setup build --prefix=/usr --libdir=lib \
-	-Dpython_path="$HOWDY_VENV/bin/python3" \
+	-Dpython_path="$HOWDY_PYTHON" \
 	-Dpam_dir=/usr/lib/security -Dlog_path=/var/log/howdy
 ninja -C build install
 # Re-run setup now that /etc/howdy/config.ini exists, so later reinstalls do

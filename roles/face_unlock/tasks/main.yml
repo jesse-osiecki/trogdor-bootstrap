@@ -31,6 +31,14 @@
       - gst-plugin-pipewire
       - pipewire-tools
 
+# pam_howdy and the howdy CLI run python through this wrapper (meson bakes the
+# path in), so it has to exist before the build.
+- name: Backlight wrapper for Howdy's python
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/files/usr/local/bin/howdy-python"
+    dest: /usr/local/bin/howdy-python
+    mode: "0755"
+
 - name: Build and install Howdy (idempotent; skips when pam_howdy.so exists)
   ansible.builtin.script: "{{ playbook_dir }}/scripts/build-howdy.sh"
   args: { creates: /usr/lib/security/pam_howdy.so }
@@ -40,6 +48,7 @@
     HOWDY_VENV: "{{ howdy_venv }}"
     DLIB_VERSION: "{{ dlib_version }}"
     PATCH_DIR: "{{ playbook_dir }}/patches/howdy"
+    HOWDY_PYTHON: /usr/local/bin/howdy-python
 
 - name: Howdy config (PipeWire front camera, rubber stamps off)
   ansible.builtin.template:
@@ -66,6 +75,21 @@
     owner: "{{ device_user }}"
     group: "{{ device_user }}"
     mode: "0644"
+
+# Plain white lock screen: with the wrapper's max backlight it lights the face
+# for the camera (the greeter reads kscreenlockerrc on every lock).
+- name: Lock screen wallpaper is solid white
+  ansible.builtin.shell: |
+    plugin=$(kreadconfig6 --file kscreenlockerrc --group Greeter --key WallpaperPlugin)
+    color=$(kreadconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.color --group General --key Color)
+    [ "$plugin" = org.kde.color ] && [ "$color" = 255,255,255 ] && exit 0
+    kwriteconfig6 --file kscreenlockerrc --group Greeter --key WallpaperPlugin org.kde.color
+    kwriteconfig6 --file kscreenlockerrc --group Greeter --group Wallpaper --group org.kde.color --group General --key Color 255,255,255
+    echo changed
+  register: lock_wallpaper
+  changed_when: "'changed' in lock_wallpaper.stdout"
+  become: true
+  become_user: "{{ device_user }}"
 
 - name: Enrolled face models
   ansible.builtin.find:
