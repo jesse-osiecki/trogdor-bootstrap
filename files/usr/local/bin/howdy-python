@@ -12,7 +12,8 @@ BL=/sys/class/backlight/backlight
 old=$(cat "$BL/brightness")
 cat "$BL/max_brightness" > "$BL/brightness"
 
-"$PY" "$@" &
+exec 3<&0
+"$PY" "$@" <&3 &
 pid=$!
 trap 'kill -TERM "$pid" 2>/dev/null' TERM INT HUP
 wait "$pid"
