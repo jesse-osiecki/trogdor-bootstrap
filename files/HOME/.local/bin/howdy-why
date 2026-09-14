@@ -10,8 +10,7 @@ tagged pam_howdy and compare.py's own output (rubber stamp chatter when
 verbose_stamps = true) lands under the greeter's tag, usually
 kwin_wayland_wrapper. This groups the two by time and says what happened.
 Rubber stamps (the nod check) are off since 2026-09-14, so exit 15 cases
-only appear if they are re-enabled; stamp chatter also needs the stderr
-redirect patch that was dropped the same day.
+only appear if they are re-enabled.
 """
 import argparse
 import re

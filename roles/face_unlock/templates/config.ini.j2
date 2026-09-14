@@ -132,7 +132,7 @@ enabled = false
 # failure mode are required. One line per stamp. Rule syntax:
 #  stamptype  timeout  (failsafe | faildeadly)   [extra_argument=value]
 stamp_rules =
-	nod		5s		failsafe     min_distance=12
+	{{ howdy_nod_rule }}
 
 [debug]
 # Show a short but detailed diagnostic report in console
@@ -140,7 +140,7 @@ stamp_rules =
 end_report = false
 
 # More verbose logging from the rubberstamps system
-verbose_stamps = false
+verbose_stamps = true
 
 # Pass output of the GTK auth window to the terminal
 gtk_stdout = false

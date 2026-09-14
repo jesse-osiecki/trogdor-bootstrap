@@ -1,0 +1,33 @@
+From 23215f111ae53b82e5cbfb475446ff21f5b7fb07 Mon Sep 17 00:00:00 2001
+From: Jesse Osiecki <jesse@jjo.ninja>
+Date: Sun, 13 Sep 2026 18:42:02 -0400
+Subject: [PATCH 3/4] compare: print to stderr when stdout is not a terminal
+
+Under the lock-screen greeter stdout is a pipe nobody reads, so the
+timeout notice and the rubber stamp verbosity never reached the journal;
+stderr does.
+---
+ howdy/src/compare.py | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/howdy/src/compare.py b/howdy/src/compare.py
+index 666fb8b..0a10299 100644
+--- a/howdy/src/compare.py
++++ b/howdy/src/compare.py
+@@ -27,6 +27,13 @@ from detector import load_face_detector
+ from recorders.video_capture import VideoCapture
+ from i18n import _
+ 
++# Under PAM this script inherits the greeter's stdio. Its stderr is a journal
++# stream, its stdout usually a pipe nobody reads, so route everything that is
++# printed (timeout notices, rubber stamp verbosity) to stderr when stdout is
++# not a terminal. Interactive runs (pamtest, a shell) are unchanged.
++if not sys.stdout.isatty():
++	sys.stdout = sys.stderr
++
+ def exit(code=None):
+ 	"""Exit while closing howdy-gtk properly"""
+ 	global gtk_proc
+-- 
+2.54.0
+

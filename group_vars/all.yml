@@ -44,3 +44,5 @@ howdy_timeout: 10
 howdy_certainty: "3.5"
 # HOG detector cutoff; -1.0 still finds a backlit face on the couch (2026-09-13)
 howdy_detection_threshold: "-1.0"
+# inert while [rubberstamps] enabled = false (nod switched off 2026-09-14)
+howdy_nod_rule: "nod		5s		faildeadly   min_distance=8"
