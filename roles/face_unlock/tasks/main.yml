@@ -41,7 +41,7 @@
     DLIB_VERSION: "{{ dlib_version }}"
     PATCH_DIR: "{{ playbook_dir }}/patches/howdy"
 
-- name: Howdy config (PipeWire front camera, nod check)
+- name: Howdy config (PipeWire front camera, rubber stamps off)
   ansible.builtin.template:
     src: config.ini.j2
     dest: /etc/howdy/config.ini

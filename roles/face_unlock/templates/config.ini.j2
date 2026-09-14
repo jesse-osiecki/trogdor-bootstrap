@@ -126,13 +126,13 @@ save_successful = false
 
 [rubberstamps]
 # Enable specific extra checks after the user has been recognised
-enabled = true
+enabled = false
 
 # What type of stamps to run and with what options. The type, timeout and
 # failure mode are required. One line per stamp. Rule syntax:
 #  stamptype  timeout  (failsafe | faildeadly)   [extra_argument=value]
 stamp_rules =
-	{{ howdy_nod_rule }}
+	nod		5s		failsafe     min_distance=12
 
 [debug]
 # Show a short but detailed diagnostic report in console
@@ -140,7 +140,7 @@ stamp_rules =
 end_report = false
 
 # More verbose logging from the rubberstamps system
-verbose_stamps = true
+verbose_stamps = false
 
 # Pass output of the GTK auth window to the terminal
 gtk_stdout = false
