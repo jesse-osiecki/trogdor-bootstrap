@@ -9,8 +9,6 @@ Howdy runs as a child of the lock-screen greeter, so pam_howdy's verdict is
 tagged pam_howdy and compare.py's own output (rubber stamp chatter when
 verbose_stamps = true) lands under the greeter's tag, usually
 kwin_wayland_wrapper. This groups the two by time and says what happened.
-Rubber stamps (the nod check) are off since 2026-09-14, so exit 15 cases
-only appear if they are re-enabled.
 """
 import argparse
 import re
@@ -19,7 +17,7 @@ import sys
 from datetime import datetime, timedelta
 
 VERDICTS = {
-    "Login approved": ("approved", "face matched (and the rubber stamps passed, when any are enabled)"),
+    "Login approved": ("approved", "face matched and the nod check passed"),
     "Failure, timeout reached": ("no face", "no matching face within the timeout: either the detector never found a face or it did not match an enrolled model"),
     "Failure, no face model known": ("no model", "no face model enrolled for this user (sudo howdy add <label>)"),
     "Failure, general abort": ("abort", "compare.py aborted (bad config or a stamp rule it could not parse)"),
