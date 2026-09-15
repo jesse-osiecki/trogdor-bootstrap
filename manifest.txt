@@ -21,3 +21,4 @@ face_unlock 0644 /etc/pam.d/kde-fingerprint
 face_unlock 0755 ~/.local/bin/howdy-add-face.sh
 face_unlock 0755 ~/.local/bin/howdy-why
 face_unlock 0755 /usr/local/bin/howdy-python
+face_unlock 0644 /etc/tmpfiles.d/howdy-snapshots.conf
