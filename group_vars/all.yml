@@ -19,6 +19,10 @@ local_apks:
   - linux-postmarketos-qcom-sc7180-6.18.40-r1.apk
   - qmlkonsole-26.04.2-r4.apk
   - qmlkonsole-lang-26.04.2-r4.apk
+  # plasma-mobile with the lock screen re-arming Howdy on screen wake (~/code/plasma-mobile-fix)
+  - plasma-mobile-6.6.6-r1.apk
+  - plasma-mobile-lang-6.6.6-r1.apk
+  - plasma-mobile-systemd-6.6.6-r1.apk
 
 # --- dev ---
 git_user_name: Jesse Osiecki
