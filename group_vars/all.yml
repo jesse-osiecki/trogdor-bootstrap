@@ -23,6 +23,9 @@ local_apks:
   - plasma-mobile-6.6.6-r1.apk
   - plasma-mobile-lang-6.6.6-r1.apk
   - plasma-mobile-systemd-6.6.6-r1.apk
+  # kscreenlocker re-arming finished non-interactive authenticators (~/code/kscreenlocker-fix)
+  - kscreenlocker-99996.6.6-r2.apk
+  - kscreenlocker-lang-99996.6.6-r2.apk
 
 # --- dev ---
 git_user_name: Jesse Osiecki
