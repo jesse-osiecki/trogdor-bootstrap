@@ -21,13 +21,20 @@ if [ -n "$need" ]; then
 	sudo apk add $need
 fi
 
-if ! grep -q "^    $host:" inventory/hosts.yml; then
-	echo "!! $host is not in inventory/hosts.yml. Add it (ansible_connection: local)" >&2
-	echo "   and create inventory/host_vars/$host.yml to switch roles on." >&2
+# Per-device files are gitignored; create them from the examples on first run.
+if [ ! -f inventory/hosts.yml ]; then
+	printf 'all:\n  hosts:\n    %s:\n      ansible_connection: local\n' "$host" > inventory/hosts.yml
+	echo "==> wrote inventory/hosts.yml for $host"
+elif ! grep -q "^    $host:" inventory/hosts.yml; then
+	echo "!! $host is not in inventory/hosts.yml (add it with ansible_connection: local)" >&2
 	exit 1
 fi
+if [ ! -f "inventory/host_vars/$host.yml" ]; then
+	cp inventory/host_vars/example.yml "inventory/host_vars/$host.yml"
+	echo "==> wrote inventory/host_vars/$host.yml from the example; edit it to switch roles on"
+fi
 
-set -- --limit "$host" "$@"
+set -- --limit "$host" -e "device_user=$(id -un)" "$@"
 if [ -n "${LUKS_PASSPHRASE:-}" ]; then
 	set -- "$@" -e "luks_passphrase=$LUKS_PASSPHRASE"
 fi

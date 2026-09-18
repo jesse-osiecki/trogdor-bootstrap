@@ -1,0 +1,14 @@
+# Per-device switches and personal values. bootstrap.sh copies this file to
+# inventory/host_vars/$(hostname).yml (gitignored) on first run; edit that copy.
+enable_dev: false
+enable_unattended: false     # insecure, see README
+enable_face_unlock: false
+
+# dev role: git identity written to ~/.gitconfig (left alone while empty)
+git_user_name: ""
+git_user_email: ""
+
+# base role: keyd hashes, check with `sudo keyd monitor -t` (see group_vars/all.yml)
+# keyd_keyboard_hash: eb4bc35f
+# face_unlock role: PipeWire node of the front camera (`wpctl status`)
+# howdy_pipewire_target: libcamera_input._base_soc_0_cci_ac4a000_i2c-bus_0_camera_36

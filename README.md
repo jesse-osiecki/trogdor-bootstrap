@@ -1,7 +1,7 @@
 # trogdor-bootstrap
 
-Reproduces the setup of `jesse-tab` (Lenovo IdeaPad Duet 3, google-trogdor wormdingler,
-postmarketOS v26.06) on any trogdor device, and keeps that setup in sync with the working
+Reproduces a working Lenovo IdeaPad Duet 3 setup (google-trogdor wormdingler, postmarketOS
+v26.06) on any trogdor device, and keeps that setup in sync with the working
 trees where the patches are developed. The inventory of *what* was done and why is
 `~/code/INDEX.md`; this repo is the *how*.
 
@@ -11,8 +11,8 @@ trees where the patches are developed. The inventory of *what* was done and why 
 apk add git          # the only thing you need by hand
 git clone <this repo> ~/code/trogdor-bootstrap
 cd ~/code/trogdor-bootstrap
-# add the device to inventory/hosts.yml and create inventory/host_vars/<hostname>.yml
-./bootstrap.sh --check --diff   # dry run first: what would change
+./bootstrap.sh --check --diff   # dry run first: what would change (also writes the per-device
+                                # inventory files from inventory/*.example, gitignored)
 ./bootstrap.sh                  # installs bash + ansible-core on first run, then applies site.yml
 ```
 
@@ -29,8 +29,9 @@ so re-running is always safe. It needs only `ansible-core` (no collections).
 | `unattended` | no | **insecure**: passwordless sudo, lock screen off, LUKS keyfile in the initramfs (`LUKS_PASSPHRASE=... ./bootstrap.sh --tags unattended` to enrol the key) |
 | `face_unlock` | no | Howdy built from source with the PipeWire backend, config, PAM hook, enrollment launcher |
 
-Switch roles on per device in `inventory/host_vars/<hostname>.yml` (`enable_dev: true` etc.)
-or for one run with `-e enable_face_unlock=true`. Select roles with `--tags`.
+Switch roles on per device in `inventory/host_vars/<hostname>.yml` (`enable_dev: true` etc.;
+gitignored, created from `example.yml` on the first run, and the place for personal values
+such as the git identity) or for one run with `-e enable_face_unlock=true`. Select roles with `--tags`.
 
 Not automated on purpose: the eMMC repartition for the p4 test-kernel slot
 (`~/code/trogdor-support/scripts/make-kernel-b-partition.sh`, destructive), building the kernel
@@ -43,12 +44,13 @@ and the Claude Code auto-resume entry (session-specific).
 manifest.txt        whole files managed verbatim: <role> <mode> <path>
 files/              mirror of those paths, pulled from the live system by sync.sh
                     (~ in the manifest becomes files/HOME/, owned by device_user on the device)
-patches/kernel/     pmaports package dir + format-patch of branch wormdingler-camera
+patches/kernel/     pmaports package dir from branch wormdingler-camera (+ BASE commit)
 patches/howdy/      format-patch of ~/code/howdy branch pmos-pipewire (+ BASE commit)
 patches/qmlkonsole/ the aport (APKBUILD + patches) from ~/code/qmlkonsole-fix
 apks/               built packages (gitignored; copy from a build host or rebuild)
 roles/*/templates/  files with device-specific values (howdy config, sudoers, launcher)
 group_vars/all.yml  every parameter with its default; host_vars overrides per device
+inventory/          *.example only; the real hosts.yml and host_vars are gitignored
 scripts/            build-howdy.sh (called by the role)
 ```
 
@@ -73,8 +75,9 @@ private key, the LUKS keyfile, `/etc/howdy/models/*`, Claude credentials.
 ## Kernel
 
 `patches/kernel/linux-postmarketos-qcom-sc7180/` is the complete pmaports package directory
-(APKBUILD, config, 28 patches of which 23 come from branch `wormdingler-camera`); `patches/kernel/pmaports/` is the
-same as a patch against pmaports `main` (base commit in `BASE`). To rebuild on a device with the
-`dev` role: apply the patch to a pmaports checkout, `cd` into the package directory,
+(APKBUILD, config, 28 patches of which 23 come from branch `wormdingler-camera`), taken from a
+pmaports checkout at the commit in `BASE`. To rebuild on a device with the `dev` role: copy the
+directory over `device/community/linux-postmarketos-qcom-sc7180` in a pmaports checkout at that
+commit, `cd` into it,
 `abuild checksum && abuild -d` (see `~/code/INDEX.md` 1.4 for the abuild gotchas), then drop the
 apk in `apks/`. When the camera series lands upstream, this shrinks to the config change.

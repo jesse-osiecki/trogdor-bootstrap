@@ -1,5 +1,7 @@
-# Defaults for every trogdor device. Override per device in host_vars/<hostname>.yml.
-device_user: jesse
+# Defaults for every trogdor device. Override per device in inventory/host_vars/<hostname>.yml
+# (gitignored; copy inventory/host_vars/example.yml). bootstrap.sh passes device_user as the
+# user who runs it; this fallback covers a bare ansible-playbook invocation.
+device_user: "{{ lookup('env', 'SUDO_USER') or lookup('env', 'USER') }}"
 device_home: "/home/{{ device_user }}"
 emmc_device: /dev/mmcblk1
 luks_partition: "{{ emmc_device }}p3"
@@ -33,8 +35,9 @@ local_apks:
   - kscreenlocker-lang-99996.6.6-r2.apk
 
 # --- dev ---
-git_user_name: Jesse Osiecki
-git_user_email: jesse@jjo.ninja
+# Set both in host_vars (personal; the task is skipped while they are empty).
+git_user_name: ""
+git_user_email: ""
 abuild_srcdest: "{{ device_home }}/code/qmlkonsole-fix/distfiles"
 abuild_repodest: "{{ device_home }}/code/qmlkonsole-fix/packages"
 pipx_tools: [dtschema, b4]

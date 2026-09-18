@@ -1,5 +1,5 @@
 ---
-# trogdor-bootstrap: reproduce the jesse-tab setup on a google-trogdor device.
+# trogdor-bootstrap: reproduce the reference Duet 3 setup on a google-trogdor device.
 # Run through ./bootstrap.sh (installs ansible on first use). base always runs;
 # the others are switched on per device in host_vars or with -e enable_x=true,
 # and can be selected with --tags base,dev,unattended,face_unlock.

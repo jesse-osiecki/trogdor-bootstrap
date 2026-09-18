@@ -1,3 +1,7 @@
 apks/*.apk
 *.retry
 .ansible/
+# per-device, personal: generated/copied by bootstrap.sh from the .example files
+inventory/hosts.yml
+inventory/host_vars/*
+!inventory/host_vars/example.yml

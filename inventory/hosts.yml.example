@@ -1,0 +1,6 @@
+# bootstrap.sh generates inventory/hosts.yml (gitignored) with one entry for
+# $(hostname). Keep it to this shape if you write it by hand.
+all:
+  hosts:
+    my-duet:
+      ansible_connection: local

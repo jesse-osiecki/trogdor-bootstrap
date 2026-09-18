@@ -44,11 +44,12 @@ sudo -n true 2>/dev/null || echo "   (partial: run with passwordless sudo for a 
 
 say "4. unmanaged local files"
 # Paths written by templates/tasks rather than the manifest:
-known="/etc/sudoers.d/$(sed -n 's/^device_user: *//p' group_vars/all.yml)-nopasswd /etc/mkinitfs/files-extra/00-luks-autounlock.files /etc/keyd/default.conf.bak-20260903"
+known="/etc/sudoers.d/$(id -un)-nopasswd /etc/mkinitfs/files-extra/00-luks-autounlock.files"
 for d in /usr/local/sbin /usr/local/bin /usr/lib/systemd/system-sleep /etc/sysctl.d /etc/sudoers.d /etc/mkinitfs/hooks-extra /etc/mkinitfs/files-extra; do
 	[ -d "$d" ] || continue
 	for f in "$d"/*; do
 		[ -f "$f" ] || continue
+		case "$f" in /etc/keyd/default.conf.bak-*) continue;; esac
 		grep -q " $f\$" manifest.txt || case " $known " in *" $f "*) ;; *) echo "   unmanaged $f";; esac
 	done
 done
@@ -61,7 +62,7 @@ if [ "${1:-}" = "--ansible" ] && command -v ansible-playbook >/dev/null; then
 	say "5. ansible --check --diff"
 	shift
 	if sudo -n true 2>/dev/null; then set -- "$@"; else set -- "$@" --ask-become-pass; fi
-	ansible-playbook site.yml --limit "$(hostname)" --check --diff "$@" || rc=1
+	ansible-playbook site.yml --limit "$(hostname)" -e "device_user=$(id -un)" --check --diff "$@" || rc=1
 fi
 [ $rc -eq 0 ] && echo "
 no drift" || echo "

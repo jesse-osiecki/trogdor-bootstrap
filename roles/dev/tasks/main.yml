@@ -50,6 +50,7 @@
     - { key: user.email, value: "{{ git_user_email }}" }
   become_user: "{{ device_user }}"
   changed_when: false
+  when: git_user_name | length > 0 and git_user_email | length > 0
 
 - name: pipx tools (dtschema, b4)
   ansible.builtin.command: pipx install {{ item }}
