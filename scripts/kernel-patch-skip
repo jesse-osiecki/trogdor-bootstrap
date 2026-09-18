@@ -1,0 +1,3 @@
+# One commit subject per line. kernel-refresh.sh drops these patches when it
+# rebases the camera branch onto a new kernel (use for patches that upstream
+# replaced differently, or cleanups not worth carrying). Exact subject match.
