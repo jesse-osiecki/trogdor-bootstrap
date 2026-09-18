@@ -13,6 +13,11 @@ enable_face_unlock: false
 # keyd id of the Hammer dock keyboard (NOT the touchpad, which shares 18d1:5057).
 # Find it on a new unit with: sudo keyd monitor -t
 keyd_keyboard_hash: eb4bc35f
+# keyd id of the EC buttons device (cros_ec_buttons: power, volume, lid switch).
+# cros-keyboard-map's generic k:0000:0000 matches it, and keyd's grab then swallows
+# the SW_LID events, so the tablet never sleeps on cover close. Excluded by hash
+# (name-only hash, phys is empty, so it should be the same on every trogdor unit).
+keyd_ec_buttons_hash: c68a2d8e
 zram_swap_pct: "200"
 # Locally built packages to install from apks/ (empty = skip).
 local_apks:

@@ -19,6 +19,19 @@
     backup: true
   notify: reload keyd
 
+# keyd: the generic k:0000:0000 entry (meant for the EC matrix keyboard on
+# clamshells) also matches cros_ec_buttons on detachables. keyd's grab then swallows
+# the lid switch (SW_LID) and the tablet never sleeps on cover close. Exclusions are
+# written without the k: prefix and must come BEFORE the include (first match wins).
+- name: keyd does not grab the EC buttons/lid-switch device
+  ansible.builtin.lineinfile:
+    path: /etc/keyd/default.conf
+    regexp: '^-0000:0000:[0-9a-f]+\s*$'
+    line: "-0000:0000:{{ keyd_ec_buttons_hash }}"
+    insertbefore: '^k:0000:0000\s*$'
+    backup: true
+  notify: reload keyd
+
 - name: zram swap at {{ zram_swap_pct }}% of RAM
   ansible.builtin.lineinfile:
     path: /etc/deviceinfo
