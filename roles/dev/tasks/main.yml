@@ -42,6 +42,7 @@
       - flashrom
       - coreboot-tools-cbfstool
       - neovim
+      - openssh-client   # git over ssh (GitHub); the key itself is never copied
 
 - name: git identity for {{ device_user }}
   ansible.builtin.command: git config --global {{ item.key }} "{{ item.value }}"
