@@ -1,0 +1,60 @@
+From: Jesse Osiecki <jesse@jjo.ninja>
+Subject: [PATCH] greeter: let startAuthenticating() re-arm finished non-interactive authenticators
+
+startAuthenticating() returns early while the state is Authenticating, and
+the state only goes back to Idle when the interactive (password)
+conversation fails or succeeds. A non-interactive authenticator that ends
+on its own, such as a face-recognition module in the kde-fingerprint slot
+that gives up after its timeout, therefore stays dead until the user types
+a wrong password. fprintd never showed this because its conversation waits
+indefinitely. Restart the non-interactive authenticators on every
+startAuthenticating() call.
+
+For that to be safe, PamAuthenticator::tryUnlock() must ignore the call
+while a conversation is running: PamWorker::authenticate() is invoked
+through the worker thread's event loop, so its own in-progress guard never
+sees the second call; it is queued and starts one more conversation as
+soon as the current one ends (visible today as an extra run after the
+grace timer fires during a run).
+
+Signed-off-by: Jesse Osiecki <jesse@jjo.ninja>
+---
+--- a/greeter/pamauthenticator.cpp
++++ b/greeter/pamauthenticator.cpp
+@@ -342,6 +342,13 @@
+ 
+ void PamAuthenticator::tryUnlock()
+ {
++    if (m_inAuthentication) {
++        // A conversation is already running. authenticate() is invoked
++        // through the worker's event loop, so a second call would not be
++        // rejected by its guard but queued, and start another conversation
++        // the moment this one ends.
++        return;
++    }
+     m_unlocked = false;
+     QMetaObject::invokeMethod(d, &PamWorker::authenticate);
+ }
+--- a/greeter/pamauthenticators.cpp
++++ b/greeter/pamauthenticators.cpp
+@@ -141,7 +141,19 @@
+ 
+ void PamAuthenticators::startAuthenticating()
+ {
+-    if (d->state == AuthenticatorsState::Authenticating || d->graceLocked) {
++    if (d->graceLocked) {
++        return;
++    }
++
++    if (d->state == AuthenticatorsState::Authenticating) {
++        // The interactive conversation is still waiting for input, but a
++        // non-interactive one may have ended on its own (a face module gives
++        // up after a few seconds, unlike fprintd). Start those again so the
++        // lock screen can re-arm them on wake; one that is still running is
++        // left alone, tryUnlock() is a no-op while busy.
++        for (auto &&noninteractive : d->noninteractive) {
++            noninteractive->tryUnlock();
++        }
+         return;
+     }
+ 

@@ -1,0 +1,34 @@
+From: Jesse Osiecki <jesse@jjo.ninja>
+Subject: [PATCH] lockscreen: start authenticating again when the screen wakes
+
+The non-interactive authenticators (fingerprint, or a face module in the
+kde-fingerprint PAM slot) run one PAM conversation per
+startAuthenticating() call. The mobile lock screen only calls it when it
+is created, when a password is tried and after a failed try, so after the
+screen turns off (idle, power button, suspend) the reader stays idle until
+the user types something. Re-arm it when DPMS turns the screen back on,
+which is exactly when the user is looking at the device again.
+
+Signed-off-by: Jesse Osiecki <jesse@jjo.ninja>
+---
+ shell/contents/lockscreen/LockScreen.qml | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/shell/contents/lockscreen/LockScreen.qml b/shell/contents/lockscreen/LockScreen.qml
+--- a/shell/contents/lockscreen/LockScreen.qml
++++ b/shell/contents/lockscreen/LockScreen.qml
+@@ -95,6 +95,14 @@
+                 lockScreenState.resetPassword();
+             }
+         }
++
++        // Non-interactive authenticators (fingerprint, face) stop when their
++        // PAM conversation ends; arm them again when the screen wakes up.
++        onDpmsTurnedOn: (screen) => {
++            if (screen.name === Screen.name) {
++                authenticator.startAuthenticating();
++            }
++        }
+     }
+ 
+     // Container for lockscreen contents

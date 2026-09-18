@@ -48,6 +48,7 @@ patches/kernel/     pmaports package dir from branch wormdingler-camera (+ BASE 
 patches/howdy/      format-patch of ~/code/howdy branch pmos-pipewire (+ BASE commit)
 patches/qmlkonsole/ the aport (APKBUILD + patches) from ~/code/qmlkonsole-fix
 apks/               built packages (gitignored; copy from a build host or rebuild)
+aports/             APKBUILD + patch for each locally built package (plasma-mobile, kscreenlocker); rebuild with `abuild -r` there
 roles/*/templates/  files with device-specific values (howdy config, sudoers, launcher)
 group_vars/all.yml  every parameter with its default; host_vars overrides per device
 inventory/          *.example only; the real hosts.yml and host_vars are gitignored
