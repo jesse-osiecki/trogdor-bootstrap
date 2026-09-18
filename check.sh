@@ -1,7 +1,8 @@
 #!/bin/sh
 # Drift check: does the live system still match this repo?
 #   1. manifest files:  diff repo copy vs system
-#   2. line edits:      keyd ids (keyboard hash, EC buttons exclusion), zram pct
+#   2. line edits:      keyd ids (keyboard hash, EC buttons exclusion), zram pct,
+#                       LibreWolf stub package absent
 #   3. apk audit:       package-owned files changed under /etc (needs root)
 #   4. unmanaged:       local files in the directories we manage that the
 #                       manifest does not know about
@@ -34,6 +35,8 @@ echash=$(sed -n 's/^keyd_ec_buttons_hash: *//p' inventory/host_vars/"$(hostname)
 if grep -qx -- "-0000:0000:$echash" /etc/keyd/default.conf && grep -n -E '^(-0000:0000:|k:0000:0000)' /etc/keyd/default.conf | head -1 | grep -q -- '-0000'; then echo "   ok      keyd excludes cros_ec_buttons $echash"; else echo "   DRIFT   keyd: cros_ec_buttons exclusion missing or after k:0000:0000"; rc=1; fi
 pct=$(sed -n 's/^zram_swap_pct: *"\(.*\)"/\1/p' group_vars/all.yml)
 if grep -qx "deviceinfo_zram_swap_pct=\"$pct\"" /etc/deviceinfo; then echo "   ok      zram $pct%"; else echo "   DRIFT   zram: $(grep zram_swap_pct /etc/deviceinfo || echo unset)"; rc=1; fi
+# the stub takes the autoconfig slot from librewolf.cfg (trogdor-support/librewolf/README.md)
+if apk info -e mobile-config-firefox-librewolf >/dev/null 2>&1; then echo "   DRIFT   mobile-config-firefox-librewolf is installed (disables librewolf.cfg)"; rc=1; else echo "   ok      librewolf stub package absent"; fi
 
 say "3. apk audit: package-owned files modified under /etc (U = changed)"
 # Expected U lines: deviceinfo, keyd/default.conf, pam.d/kde-fingerprint (ours);

@@ -7,6 +7,7 @@ base        0644 /etc/sysctl.d/99-zram-tuning.conf
 base        0644 /etc/udev/rules.d/61-cros-ec-accel.rules
 base        0644 /usr/share/libcamera/ipa/simple/ov5675.yaml
 base        0644 /usr/share/libcamera/ipa/simple/ov8856.yaml
+base        0644 ~/.config/librewolf/librewolf/librewolf.overrides.cfg
 dev         0755 /usr/local/sbin/kernel-deadman
 dev         0755 /usr/local/sbin/kernel-keep
 dev         0755 /usr/local/sbin/dmesg-live

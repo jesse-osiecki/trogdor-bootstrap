@@ -2,11 +2,27 @@
 - name: Packages every device gets
   ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/apk.yml"
   vars:
-    apk_packages: [bash, keyd, cros-keyboard-map, libcamera-tools, pipewire-tools]
+    apk_packages: [bash, keyd, cros-keyboard-map, libcamera-tools, pipewire-tools, librewolf, mobile-config-firefox]
 
-- name: Managed files (sleep LED hook, sysctl, accel udev rule, libcamera tuning)
+- name: Managed files (sleep LED hook, sysctl, accel udev rule, libcamera tuning, LibreWolf overrides)
   ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/managed_files.yml"
   vars: { role_name: base }
+
+# LibreWolf: the stub package mobile-config-firefox-librewolf points
+# general.config.filename at its own autoconfig, which stops librewolf.cfg (the
+# privacy defaults) from loading. The managed librewolf.overrides.cfg boots
+# mobile-config-firefox from inside librewolf.cfg instead, so the stub must stay
+# away. See ~/code/trogdor-support/librewolf/README.md.
+- name: "LibreWolf: is the mobile-config stub package installed"
+  ansible.builtin.command: apk info -e mobile-config-firefox-librewolf
+  register: mcf_stub
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: "LibreWolf: remove the stub that replaces librewolf.cfg"
+  ansible.builtin.command: apk del mobile-config-firefox-librewolf
+  when: mcf_stub.rc == 0
 
 # keyd: cros-keyboard-map matches k:18d1:5057, which is both the Hammer keyboard
 # and its touchpad, so keyd grabs the touchpad and the cursor jumps to the finger.
