@@ -1,84 +1,111 @@
 # trogdor-bootstrap
 
-Reproduces a working Lenovo IdeaPad Duet 3 setup (google-trogdor wormdingler, postmarketOS
-v26.06) on any trogdor device, and keeps that setup in sync with the working
-trees where the patches are developed. The inventory of *what* was done and why is
-`~/code/INDEX.md`; this repo is the *how*.
+Rebuilds a working Lenovo IdeaPad Duet 3 (google-trogdor wormdingler, postmarketOS v26.06)
+from a fresh install, and keeps the patched packages current. *What* was done and why:
+`~/code/INDEX.md`. *How*: this repo.
 
-## Quick start on a fresh install
+## Fresh device: 4 commands, about 20 minutes
 
 ```sh
-apk add git          # the only thing you need by hand
-git clone <this repo> ~/code/trogdor-bootstrap
+apk add git
+git clone https://github.com/jesse-osiecki/trogdor-bootstrap ~/code/trogdor-bootstrap
 cd ~/code/trogdor-bootstrap
-./bootstrap.sh --check --diff   # dry run first: what would change (also writes the per-device
-                                # inventory files from inventory/*.example, gitignored)
-./bootstrap.sh                  # installs bash + ansible-core on first run, then applies site.yml
+./bootstrap.sh --check --diff     # dry run: shows what would change, writes inventory/ from the examples
 ```
 
-`bootstrap.sh` is POSIX sh so it runs under busybox ash. It uses sudo, asking for the
-password unless sudo is passwordless. Everything else is Ansible, run locally and idempotent,
-so re-running is always safe. It needs only `ansible-core` (no collections).
+Then run `./bootstrap.sh` for real. First run installs bash and ansible-core, then applies
+`site.yml` locally. Re-running is always safe (idempotent). Needs sudo.
+
+Next: switch on the optional roles you want in `inventory/host_vars/<hostname>.yml`
+(`enable_dev: true`, ...) and run `./bootstrap.sh` again.
 
 ## Roles
 
-| Role | On by default | What it does |
+| Role | Default | Does |
 |---|---|---|
-| `base` | yes | bash, keyd touchpad fix (line edit), LED sleep hook, accelerometer udev rule (auto-rotation), zram tuning, libcamera tuning files, local apks (camera kernel, patched qmlkonsole) |
-| `dev` | no | kernel/packaging toolchain, pipx tools, git identity, abuild key + config, test-kernel dead-man switch and telemetry units |
-| `unattended` | no | **insecure**: passwordless sudo, lock screen off, LUKS keyfile in the initramfs (`LUKS_PASSPHRASE=... ./bootstrap.sh --tags unattended` to enrol the key) |
-| `face_unlock` | no | Howdy built from source with the PipeWire backend, config, PAM hook, enrollment launcher |
+| `base` | on | bash, keyd touchpad fix, LED sleep hook, auto-rotation udev rule, zram, libcamera tuning, local apks (camera kernel, patched qmlkonsole, kscreenlocker, plasma-mobile) |
+| `dev` | off | toolchain, pipx tools, git identity, abuild key, kernel test slot units (dead-man switch, self-test) |
+| `unattended` | off | **insecure**: passwordless sudo, lock screen off, LUKS keyfile in the initramfs. Enrol the key with `LUKS_PASSPHRASE=... ./bootstrap.sh --tags unattended` |
+| `face_unlock` | off | Howdy from source with the PipeWire backend, config, PAM hook, enrolment launcher |
 
-Switch roles on per device in `inventory/host_vars/<hostname>.yml` (`enable_dev: true` etc.;
-gitignored, created from `example.yml` on the first run, and the place for personal values
-such as the git identity) or for one run with `-e enable_face_unlock=true`. Select roles with `--tags`.
+One-off values a new unit needs: keyd keyboard hash (`sudo keyd monitor -t`), PipeWire camera
+node (`wpctl status`). Put them in `host_vars`. Never commit: abuild private key, LUKS keyfile,
+`/etc/howdy/models/*`, Claude credentials.
 
-Not automated on purpose: the eMMC repartition for the p4 test-kernel slot
-(`~/code/trogdor-support/scripts/make-kernel-b-partition.sh`, destructive), building the kernel
-package (two hours; the built apk goes in `apks/`), face enrollment (`sudo howdy add <label>`),
-and the Claude Code auto-resume entry (session-specific).
+Done by hand on purpose: eMMC repartition for the p4 test slot (destructive,
+`~/code/trogdor-support/scripts/make-kernel-b-partition.sh`), face enrolment
+(`sudo howdy add <label>`), and the kernel package build (see below).
 
-## Where things come from
+## When an upstream moves: refresh the patch sets
+
+Run `scripts/patch-refresh.sh all`. It prints, per project, our version vs upstream and stops.
+Projects: `kernel`, `qmlkonsole`, `kscreenlocker`, `plasma-mobile`, `howdy`.
+
+When one reports a newer upstream:
+
+1. `scripts/patch-refresh.sh <project> --dry-run` (rebases on throw-away branches, shows the aport diff; ~5 min, kernel ~10 with the tarball download)
+2. `scripts/patch-refresh.sh <project> --apply` (rebases for real, regenerates the aport, commits or syncs, tags)
+3. `scripts/patch-refresh.sh <project> --build` (abuild; kernel about 2 h on the tablet)
+4. `scripts/patch-refresh.sh <project> --test` (kernel: flashes the unproven p4 slot; you reboot, `kernel-deadman` falls back by itself, `sudo kernel-keep` if the desktop and cameras work)
+5. `scripts/patch-refresh.sh <project> --install` (apk pins by checksum, then `sync.sh` + `check.sh`)
+
+Works from a fresh clone of this repo: the working trees it needs (pmaports, Alpine aports,
+the stable kernel, the KDE qmlkonsole clone, howdy) are cloned under `~/code` (or `$CODE`) when
+missing, and the patch branches are rebuilt from the patch files this repo carries
+(`patches/`, `aports/`). Needs `git`, `abuild` (the `dev` role) and network.
+
+It stops on a rebase conflict, a patch that no longer applies, or a failed build, and tells you
+where the worktree is. Patches that upstream already merged are skipped by subject match;
+`refresh/<project>.skip` lists patches to drop on purpose. Configs and keys: `refresh/README.md`.
+`scripts/kernel-refresh.sh` is an alias for `patch-refresh.sh kernel`.
+
+Where the patches live:
+
+| Project | Patches | Upstream followed |
+|---|---|---|
+| kernel | branch `wormdingler-camera-<ver>` in `~/code/linux` | pmaports `origin/main` + stable tag |
+| qmlkonsole | branch `fix/stale-framebuffer` in `~/code/qmlkonsole-fix/qmlkonsole` + 2 loose patches | Alpine aports `3.24-stable` + KDE tag |
+| kscreenlocker, plasma-mobile | patch files in `*-fix/aport/` | pmaports `origin/v26.06`, Alpine `3.24-stable` |
+| howdy | branch `pmos-pipewire` in `~/code/howdy`, exported to `patches/howdy/` | GitHub master |
+
+Tags: `wormdingler-camera/<ver>-r<rel>` (linux) and `linux-postmarketos-qcom-sc7180-<ver>-r<rel>`
+(pmaports) per kernel package; `pmos-vXX.YY` on this repo per postmarketOS release.
+
+## Keeping the repo and the device in sync
+
+Rule: edit in the working tree or in this repo, apply with `bootstrap.sh`, never hand-copy.
+
+1. Changed a patch branch or a system file: `./sync.sh`, review `git diff`, commit.
+2. Does the tablet still match the repo: `./check.sh` (files, line edits, `apk audit`; `--ansible` adds a full `--check --diff`).
+3. New whole file: add its path to `manifest.txt` under its role, run `./sync.sh`.
+4. Value that differs per device: default in `group_vars/all.yml` + a template.
+5. Package-owned file (like `/etc/keyd/default.conf`): a `lineinfile` task, never a copy, so apk upgrades don't fight it.
+
+## Layout
 
 ```
 manifest.txt        whole files managed verbatim: <role> <mode> <path>
-files/              mirror of those paths, pulled from the live system by sync.sh
-                    (~ in the manifest becomes files/HOME/, owned by device_user on the device)
+files/              mirror of those paths, pulled from the live system by sync.sh (~ -> files/HOME/)
 patches/kernel/     pmaports package dir from branch wormdingler-camera (+ BASE commit)
 patches/howdy/      format-patch of ~/code/howdy branch pmos-pipewire (+ BASE commit)
 patches/qmlkonsole/ the aport (APKBUILD + patches) from ~/code/qmlkonsole-fix
+aports/             APKBUILD + patch for plasma-mobile and kscreenlocker
 apks/               built packages (gitignored; copy from a build host or rebuild)
-aports/             APKBUILD + patch for each locally built package (plasma-mobile, kscreenlocker); rebuild with `abuild -r` there
-roles/*/templates/  files with device-specific values (howdy config, sudoers, launcher)
+refresh/            one config per patched project for patch-refresh.sh
+roles/*/templates/  files with device-specific values
 group_vars/all.yml  every parameter with its default; host_vars overrides per device
-inventory/          *.example only; the real hosts.yml and host_vars are gitignored
-scripts/            build-howdy.sh (called by the role)
+inventory/          *.example only; real hosts.yml and host_vars are gitignored
+scripts/            patch-refresh.sh, kernel-refresh.sh, lib-kernel-test.sh, build-howdy.sh
+docs/               PLASMA-6.8-MIGRATION.md: runbook for moving face unlock to Plasma 6.8's native slot
 ```
 
-## Keeping it current
+## Building the kernel package by hand
 
-The rule: edit in the working tree or in this repo, apply with `bootstrap.sh`, never hand-copy.
+`patches/kernel/linux-postmarketos-qcom-sc7180/` is the full pmaports package directory
+(APKBUILD, config, 28 patches, 23 of them ours), taken at the commit in `BASE`.
 
-- After changing a patch branch or a system file: `./sync.sh`, then `git diff` shows exactly what
-  moved. Commit it.
-- To see whether the tablet still matches the repo: `./check.sh` (files, line edits, `apk audit`,
-  unmanaged files in the directories we own; the audit is complete only with passwordless sudo). `./check.sh --ansible` adds a full
-  `ansible-playbook --check --diff`, which also covers templates, packages and units.
-- Adding a new whole file: put its path in `manifest.txt` under the right role, run `./sync.sh`.
-  Adding a value that differs between devices: `group_vars/all.yml` default + template.
-- Editing a package-owned file (like `/etc/keyd/default.conf`): a `lineinfile` task, never a copy,
-  so apk upgrades don't fight it.
+1. In a pmaports checkout at that commit, copy the directory over `device/community/linux-postmarketos-qcom-sc7180`.
+2. `cd` into it, `abuild checksum && abuild -d` (abuild gotchas: `~/code/INDEX.md` 1.4).
+3. Drop the apk in `apks/`.
 
-Device-specific values you will need for a new unit: the keyd keyboard hash
-(`sudo keyd monitor -t`) and the PipeWire camera node (`wpctl status`). Never commit: the abuild
-private key, the LUKS keyfile, `/etc/howdy/models/*`, Claude credentials.
-
-## Kernel
-
-`patches/kernel/linux-postmarketos-qcom-sc7180/` is the complete pmaports package directory
-(APKBUILD, config, 28 patches of which 23 come from branch `wormdingler-camera`), taken from a
-pmaports checkout at the commit in `BASE`. To rebuild on a device with the `dev` role: copy the
-directory over `device/community/linux-postmarketos-qcom-sc7180` in a pmaports checkout at that
-commit, `cd` into it,
-`abuild checksum && abuild -d` (see `~/code/INDEX.md` 1.4 for the abuild gotchas), then drop the
-apk in `apks/`. When the camera series lands upstream, this shrinks to the config change.
+When the camera series lands upstream this shrinks to the config change and the refresh flow retires.
