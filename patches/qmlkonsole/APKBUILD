@@ -2,7 +2,6 @@
 #   fix-scroll-tracking-latch.patch        view stuck at the top of the scrollback
 #   fix-contentsrect-truncation.patch      unpainted edge strip from a truncated item rect
 #   fix-framebuffer-initial-repaint.patch  uninitialised framebuffer showing in the margins
-#   experiment-image-render-target.patch    EXPERIMENTAL: Image render target, under evaluation
 # Pinned to the version shipped in Alpine v3.24 / postmarketOS v26.06.
 # Contributor: Bart Ribbers <bribbers@disroot.org>
 
@@ -11,7 +10,7 @@
 maintainer="team/kde <bribbers@disroot.org>"
 pkgname=qmlkonsole
 pkgver=26.04.2
-pkgrel=4
+pkgrel=5
 pkgdesc="Terminal app for Plasma Mobile"
 # armhf blocked by extra-cmake-modules
 arch="all !armhf"
@@ -39,7 +38,6 @@ source="https://download.kde.org/stable/release-service/$pkgver/src/qmlkonsole-$
 	fix-scroll-tracking-latch.patch
 	fix-contentsrect-truncation.patch
 	fix-framebuffer-initial-repaint.patch
-	experiment-image-render-target.patch
 	"
 # No tests
 options="!check"
@@ -61,5 +59,4 @@ sha512sums="
 f27e7a0a03075709df2c5a586aef02905aa0c0d3124b5f52b94cadde1604801413ae5577072443d887a72afdea3499aa748fcbb07e2aac0c58bc4bd021a0f012  fix-scroll-tracking-latch.patch
 9f6cb6fdb71a3c0785a8d3eb27b2270b0eb024e44e37957c1c16cad837aaa3eb9e1d2f4cf132ac22d53a7f8e092e0303bb4bb6944403b0b1f555071bb23150e0  fix-contentsrect-truncation.patch
 d081674939e7e9133c0b086bf3f44d006de7a4bac615180aa96e06ae78717384957481176eeabbdee0586acafdf5068286859d59d99722f8f96dc54b6a54635b  fix-framebuffer-initial-repaint.patch
-8d1d1a2bdec0f988562418bbf52e27828d4c76c79318080971546d5c97efa5ced7d65161c43d78753e317d5cc8272a1e01d246f3ef331d3f271eac4fca9ca6ce  experiment-image-render-target.patch
 "
