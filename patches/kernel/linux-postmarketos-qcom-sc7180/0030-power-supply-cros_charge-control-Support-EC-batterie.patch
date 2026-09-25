@@ -1,0 +1,166 @@
+From 56b1cb19446b287a4f28e5d2a1e337f03cc5e5f3 Mon Sep 17 00:00:00 2001
+From: Jesse Osiecki <jesse@jjo.ninja>
+Date: Fri, 25 Sep 2026 13:04:02 -0400
+Subject: [PATCH 30/30] power: supply: cros_charge-control: Support EC
+ batteries without ACPI
+
+The driver finds the battery to extend through the ACPI battery hook and
+therefore depends on ACPI_BATTERY. ChromeOS EC based ARM boards describe
+the EC in device tree and have no ACPI at all, so the charge limit and
+charge behaviour controls the EC offers are out of reach there, even
+though the EC firmware implements exactly the same command
+(EC_CMD_CHARGE_CONTROL v2 with the battery sustainer on the Trogdor
+family, for instance).
+
+On these boards the battery the EC charges is a power supply that hangs
+off the EC itself: a Smart Battery behind the EC's I2C tunnel, or a
+similar child of the EC transport device. When the ACPI hook has not
+attached a battery, walk the registered power supplies and pick the
+system battery whose device hierarchy leads up to the EC's transport
+device, then register the extension on it directly. The battery driver
+may bind after this driver, so defer the probe until it is there; on
+ACPI systems keep waiting for the hook instead.
+
+Relax the Kconfig dependency to only keep the driver a module when
+ACPI_BATTERY is a module; the hook API has stubs when it is disabled.
+
+Tested on a Lenovo IdeaPad Duet 3 (google-trogdor wormdingler, sbs-battery
+behind cros-ec-i2c-tunnel): charge_behaviour and
+charge_control_end_threshold appear on the sbs battery and the EC's
+sustainer follows them.
+
+Signed-off-by: Jesse Osiecki <jesse@jjo.ninja>
+---
+ drivers/power/supply/Kconfig               |  2 +-
+ drivers/power/supply/cros_charge-control.c | 91 +++++++++++++++++++++-
+ 2 files changed, 91 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/power/supply/Kconfig b/drivers/power/supply/Kconfig
+index dca4be23ee..a294445c54 100644
+--- a/drivers/power/supply/Kconfig
++++ b/drivers/power/supply/Kconfig
+@@ -953,7 +953,7 @@ config CHARGER_CROS_PCHG
+ config CHARGER_CROS_CONTROL
+ 	tristate "ChromeOS EC based charge control"
+ 	depends on MFD_CROS_EC_DEV
+-	depends on ACPI_BATTERY
++	depends on ACPI_BATTERY || ACPI_BATTERY=n
+ 	default MFD_CROS_EC_DEV
+ 	help
+ 	  Say Y here to enable ChromeOS EC based battery charge control.
+diff --git a/drivers/power/supply/cros_charge-control.c b/drivers/power/supply/cros_charge-control.c
+index 53e6a77e03..2aea2dbbce 100644
+--- a/drivers/power/supply/cros_charge-control.c
++++ b/drivers/power/supply/cros_charge-control.c
+@@ -5,6 +5,7 @@
+  *  Copyright (C) 2024 Thomas Weißschuh <linux@weissschuh.net>
+  */
+ #include <acpi/battery.h>
++#include <linux/acpi.h>
+ #include <linux/container_of.h>
+ #include <linux/dmi.h>
+ #include <linux/lockdep.h>
+@@ -241,6 +242,86 @@ static int cros_chctl_remove_battery(struct power_supply *battery, struct acpi_b
+ 	return 0;
+ }
+ 
++/*
++ * Without ACPI there is no battery hook. On device tree systems the battery
++ * the EC charges is a power supply that hangs off the EC itself, typically a
++ * Smart Battery behind the EC's I2C tunnel. Find it by walking the device
++ * hierarchy of every system battery up to the EC's transport device.
++ */
++static bool cros_chctl_psy_is_ec_battery(struct power_supply *psy, struct device *ec)
++{
++	union power_supply_propval val;
++	struct device *dev;
++
++	if (psy->desc->type != POWER_SUPPLY_TYPE_BATTERY)
++		return false;
++
++	if (!power_supply_get_property(psy, POWER_SUPPLY_PROP_SCOPE, &val) &&
++	    val.intval == POWER_SUPPLY_SCOPE_DEVICE)
++		return false;
++
++	for (dev = psy->dev.parent; dev; dev = dev->parent)
++		if (dev == ec)
++			return true;
++
++	return false;
++}
++
++static int cros_chctl_find_ec_battery(struct power_supply *psy, void *data)
++{
++	struct cros_chctl_priv *priv = data;
++
++	if (!cros_chctl_psy_is_ec_battery(psy, priv->cros_ec->dev))
++		return 0;
++
++	priv->hooked_battery = psy;
++	get_device(&psy->dev);
++
++	return 1;
++}
++
++static void cros_chctl_detach_ec_battery(void *data)
++{
++	struct cros_chctl_priv *priv = data;
++	struct power_supply *battery = priv->hooked_battery;
++
++	if (!battery)
++		return;
++
++	power_supply_unregister_extension(battery, priv->psy_ext);
++	priv->hooked_battery = NULL;
++	put_device(&battery->dev);
++}
++
++static int cros_chctl_attach_ec_battery(struct cros_chctl_priv *priv)
++{
++	struct device *dev = priv->dev;
++	int ret;
++
++	ret = power_supply_for_each_psy(priv, cros_chctl_find_ec_battery);
++	if (ret < 0)
++		return ret;
++
++	if (!priv->hooked_battery) {
++		/* ACPI batteries arrive through the battery hook instead */
++		if (IS_ENABLED(CONFIG_ACPI_BATTERY) && !acpi_disabled)
++			return 0;
++
++		return dev_err_probe(dev, -EPROBE_DEFER, "EC battery not registered yet\n");
++	}
++
++	ret = power_supply_register_extension(priv->hooked_battery, priv->psy_ext, dev, priv);
++	if (ret) {
++		put_device(&priv->hooked_battery->dev);
++		priv->hooked_battery = NULL;
++		return ret;
++	}
++
++	dev_dbg(dev, "Extending EC battery %s\n", priv->hooked_battery->desc->name);
++
++	return devm_add_action_or_reset(dev, cros_chctl_detach_ec_battery, priv);
++}
++
+ static bool probe_with_fwk_charge_control;
+ module_param(probe_with_fwk_charge_control, bool, 0644);
+ MODULE_PARM_DESC(probe_with_fwk_charge_control,
+@@ -316,7 +397,15 @@ static int cros_chctl_probe(struct platform_device *pdev)
+ 	if (ret < 0)
+ 		return ret;
+ 
+-	return devm_battery_hook_register(dev, &priv->battery_hook);
++	ret = devm_battery_hook_register(dev, &priv->battery_hook);
++	if (ret)
++		return ret;
++
++	/* The hook attaches ACPI batteries synchronously; nothing else to do then */
++	if (priv->hooked_battery)
++		return 0;
++
++	return cros_chctl_attach_ec_battery(priv);
+ }
+ 
+ static const struct platform_device_id cros_chctl_id[] = {

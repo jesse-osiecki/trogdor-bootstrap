@@ -1,0 +1,43 @@
+From b69cd7b431cbd636a2c130c29aef25b6367220be Mon Sep 17 00:00:00 2001
+From: Jesse Osiecki <jesse@jjo.ninja>
+Date: Fri, 25 Sep 2026 13:03:21 -0400
+Subject: [PATCH 29/30] ACPI: battery: Provide stubs for the battery hook API
+
+Drivers that extend a battery power supply use the ACPI battery hook to
+find the battery on ACPI systems. Some of them, such as
+cros_charge-control, can serve batteries that are not ACPI batteries at
+all and could build without ACPI, but the hook API has no stubs, so they
+are forced to depend on ACPI_BATTERY.
+
+Add empty inline versions of battery_hook_register(),
+battery_hook_unregister() and devm_battery_hook_register() when
+ACPI_BATTERY is disabled, so such drivers only need a Kconfig
+dependency that avoids the builtin-vs-module mismatch.
+
+Signed-off-by: Jesse Osiecki <jesse@jjo.ninja>
+---
+ include/acpi/battery.h | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/include/acpi/battery.h b/include/acpi/battery.h
+index c93f16dfb9..2e456627e2 100644
+--- a/include/acpi/battery.h
++++ b/include/acpi/battery.h
+@@ -18,8 +18,17 @@ struct acpi_battery_hook {
+ 	struct list_head list;
+ };
+ 
++#if IS_ENABLED(CONFIG_ACPI_BATTERY)
+ void battery_hook_register(struct acpi_battery_hook *hook);
+ void battery_hook_unregister(struct acpi_battery_hook *hook);
+ int devm_battery_hook_register(struct device *dev, struct acpi_battery_hook *hook);
++#else
++static inline void battery_hook_register(struct acpi_battery_hook *hook) {}
++static inline void battery_hook_unregister(struct acpi_battery_hook *hook) {}
++static inline int devm_battery_hook_register(struct device *dev, struct acpi_battery_hook *hook)
++{
++	return 0;
++}
++#endif
+ 
+ #endif

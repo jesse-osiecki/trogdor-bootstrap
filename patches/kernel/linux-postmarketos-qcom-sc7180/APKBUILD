@@ -3,7 +3,7 @@
 maintainer="Alicja Michalska <ellyqw@mainlining.org>"
 pkgname=linux-postmarketos-qcom-sc7180
 pkgver=6.18.40
-pkgrel=1
+pkgrel=2
 pkgdesc="Mainline kernel for Qualcomm Snapdragon 7c devices"
 arch="aarch64"
 _carch="arm64"
@@ -69,6 +69,8 @@ source="
 	0026-i2c-qcom-cci-Remove-overcautious-disable_irq-calls.patch
 	0027-i2c-qcom-cci-drop-custom-suspend-resume-and-rely-on-.patch
 	0028-i2c-qcom-cci-fix-autosuspend-cleanup.patch
+	0029-ACPI-battery-Provide-stubs-for-the-battery-hook-API.patch
+	0030-power-supply-cros_charge-control-Support-EC-batterie.patch
 	$_config
 "
 builddir="$srcdir/linux-${_kernver//_/-}"
@@ -142,5 +144,7 @@ a0f84e769461a20b076306c5e01f5e45aea6db89580ad41aad8ef987062167a1a8767b6208bf61a2
 70e85af772472c0b75fa4513c5138ab26adedc5e65651918d91a244e01f5beb5dd12934b8f9a2eaf76481739650b4d3671950951a80ae2a764c53f5b1f506066  0026-i2c-qcom-cci-Remove-overcautious-disable_irq-calls.patch
 bd858efc675915d357779913ee9b32ce21aaeeb09e1e7769908b011f137641da49011ea7157a76a6687217fc1f49d4cd5ccbbe6cb6c8194bdcb30cdc113c5096  0027-i2c-qcom-cci-drop-custom-suspend-resume-and-rely-on-.patch
 9ce13443f4879cebd2b36220e76947f55f7dc587b99c83c083a156fdb4761467d4684c31268d51f429cd550fd1da56901057afe14ab18fb57aec781e9befa54a  0028-i2c-qcom-cci-fix-autosuspend-cleanup.patch
-408dead9924cb3eebaeb97f9e27e944556d28152efe4f80ccab77ff8e967231c600dc6664dfcc4fdd9e07d46cae5a54723efaf2438092b050ad161675c767b8d  config-postmarketos-qcom-sc7180.aarch64
+2e9cdf0751436c87a6276ede39841c0ac4bf86f3755a3523077710bc595a3f1fbe6c40a0101bd6ec952ebac581f3470d8b064f9d46b60111d073296c79f13cca  0029-ACPI-battery-Provide-stubs-for-the-battery-hook-API.patch
+d4e3b6dfff4f8e460cc8a6638f411523a1e9aab6974bc02e36c01020a79d7c50fd0209e5264b3ac686eb246f3196e5899118ddb533e692c4d3abb07bb28ec6b4  0030-power-supply-cros_charge-control-Support-EC-batterie.patch
+565de3689dd57e8a6a2104799c6944fc594d218ecf31416f0f221f8dfc21da3606446dae85dd21e24d1421082f553ac8211cf8c19b80f7b6a63ebf5aa6adbc91  config-postmarketos-qcom-sc7180.aarch64
 "

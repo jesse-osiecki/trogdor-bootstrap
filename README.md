@@ -102,7 +102,7 @@ docs/               PLASMA-6.8-MIGRATION.md: runbook for moving face unlock to P
 ## Building the kernel package by hand
 
 `patches/kernel/linux-postmarketos-qcom-sc7180/` is the full pmaports package directory
-(APKBUILD, config, 28 patches, 23 of them ours), taken at the commit in `BASE`.
+(APKBUILD, config, 30 patches, 25 of them ours: 23 camera, 2 EC charge limit), taken at the commit in `BASE`.
 
 1. In a pmaports checkout at that commit, copy the directory over `device/community/linux-postmarketos-qcom-sc7180`.
 2. `cd` into it, `abuild checksum && abuild -d` (abuild gotchas: `~/code/INDEX.md` 1.4).
