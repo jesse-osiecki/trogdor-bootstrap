@@ -5,8 +5,12 @@
 kernel_test_p4() {
 	DISK=${EMMC:-/dev/mmcblk1}
 	APK=$1; T=$(mktemp -d "$CODE/.refresh-apk.XXXXXX"); tar -xzf "$APK" -C "$T" 2>/dev/null || true
-	REL_STR=$(ls "$T/lib/modules"); echo "kernel release in package: $REL_STR"
-	sudo rm -rf "/lib/modules/$REL_STR"; sudo cp -a "$T/lib/modules/$REL_STR" /lib/modules/; sudo depmod "$REL_STR"
+	# pmOS apks are merged-usr: modules live in usr/lib/modules (older ones: lib/modules)
+	MODDIR=$T/usr/lib/modules; [ -d "$MODDIR" ] || MODDIR=$T/lib/modules
+	REL_STR=$(ls "$MODDIR" 2>/dev/null | head -n1)
+	[ -n "$REL_STR" ] && [ -d "$MODDIR/$REL_STR" ] || die "no modules directory in $APK (looked in usr/lib/modules and lib/modules)"
+	echo "kernel release in package: $REL_STR"
+	sudo rm -rf "/lib/modules/$REL_STR"; sudo cp -a "$MODDIR/$REL_STR" /lib/modules/; sudo depmod "$REL_STR"
 	W=$CODE/out/$REL_STR; rm -rf "$W/work"; mkdir -p "$W/work/dtbs"
 	cp "$T/boot/vmlinuz"* "$W/work/vmlinuz"; cp "$T"/boot/dtbs/qcom/${DTB_GLOB:-sc7180-trogdor-wormdingler-*.dtb} "$W/work/dtbs/"
 	KREL=/usr/share/kernel/${PKG#linux-}/kernel.release
