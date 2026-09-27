@@ -12,7 +12,7 @@
 # general.config.filename at its own autoconfig, which stops librewolf.cfg (the
 # privacy defaults) from loading. The managed librewolf.overrides.cfg boots
 # mobile-config-firefox from inside librewolf.cfg instead, so the stub must stay
-# away. See ~/code/trogdor-support/librewolf/README.md.
+# away. See README "What each fix does".
 - name: "LibreWolf: is the mobile-config stub package installed"
   ansible.builtin.command: apk info -e mobile-config-firefox-librewolf
   register: mcf_stub
@@ -26,7 +26,7 @@
 
 # keyd: cros-keyboard-map matches k:18d1:5057, which is both the Hammer keyboard
 # and its touchpad, so keyd grabs the touchpad and the cursor jumps to the finger.
-# Narrow the match to the keyboard's device hash. See ~/code/keyd-touchpad-fix.md.
+# Narrow the match to the keyboard's device hash. See README "What each fix does".
 - name: keyd matches only the Hammer keyboard, not the touchpad
   ansible.builtin.lineinfile:
     path: /etc/keyd/default.conf

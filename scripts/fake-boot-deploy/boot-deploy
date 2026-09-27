@@ -1,0 +1,10 @@
+#!/bin/sh
+# Stand-in for boot-deploy used by build-kpart.sh: mkinitfs generates the
+# initramfs in a temp work dir and calls boot-deploy to install it. We only
+# want the archive, so copy it to the output dir and exit.
+while getopts k:i:d:o:c: opt; do
+	case $opt in
+		k) kernel=$OPTARG;; i) initfs=$OPTARG;; d) work=$OPTARG;; o) out=$OPTARG;; c) ;;
+	esac
+done
+cp "$work/$initfs" "$out/initramfs" && echo "fake-boot-deploy: copied $initfs to $out/initramfs"

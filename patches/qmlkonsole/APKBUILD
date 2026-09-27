@@ -1,4 +1,4 @@
-# Local fork: adds three patches -- see ~/code/qmlkonsole-fix/README.md.
+# Local fork: adds three patches -- see README "What each fix does".
 #   fix-scroll-tracking-latch.patch        view stuck at the top of the scrollback
 #   fix-contentsrect-truncation.patch      unpainted edge strip from a truncated item rect
 #   fix-framebuffer-initial-repaint.patch  uninitialised framebuffer showing in the margins

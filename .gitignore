@@ -5,3 +5,8 @@ apks/*.apk
 inventory/hosts.yml
 inventory/host_vars/*
 !inventory/host_vars/example.yml
+# abuild work dirs of the aports built in place
+aports/*/src/
+aports/*/pkg/
+patches/qmlkonsole/src/
+patches/qmlkonsole/pkg/

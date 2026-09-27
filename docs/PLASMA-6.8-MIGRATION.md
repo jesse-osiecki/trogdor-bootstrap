@@ -1,16 +1,17 @@
 # Face unlock: moving from the fingerprint slot to Plasma 6.8's real Face slot
 
-Written 2026-09-11 so this can be picked up cold months later. Read `TLDR.md`
-section 9 first if the setup itself is hazy. Nothing here is urgent: the
+Written 2026-09-11 so this can be picked up cold months later. Read the README
+section "Face unlock" first if the setup itself is hazy. `<user>` below is the
+device user (the one who enrolled the face). Nothing here is urgent: the
 fingerprint-slot hack keeps working on Plasma 6.8, it just keeps saying
 "fingerprint" on the lock screen.
 
 ## 0. The one-paragraph mental model
 
 Howdy is a PAM module (`/usr/lib/security/pam_howdy.so`). It runs a Python
-process (`/opt/howdy/venv/bin/python3 /usr/lib/howdy/compare.py jesse`) that
+process (`/opt/howdy/venv/bin/python3 /usr/lib/howdy/compare.py <user>`) that
 grabs frames from the front camera through PipeWire, matches them against
-`/etc/howdy/models/jesse.dat`, then runs the nod check. The Plasma lock screen
+`/etc/howdy/models/<user>.dat`, then runs the nod check (switched off by default). The Plasma lock screen
 greeter runs a few PAM "services" side by side: `kde` (password) plus some
 non-interactive ones that silently unlock on success. On Plasma 6.6 the only
 non-interactive slots are `kde-fingerprint` and `kde-smartcard`, so Howdy sits
@@ -42,8 +43,8 @@ A big apk upgrade can move things under the venv. Run these before touching PAM:
 ```
 /opt/howdy/venv/bin/python3 -c "import dlib, cv2, numpy, gi; print(dlib.__version__)"
 sudo howdy list
-gcc -O1 -o /tmp/pamtest ~/code/trogdor-support/howdy/pamtest.c -lpam
-/tmp/pamtest kde-fingerprint jesse      # look at the camera and nod: expect rc=0
+gcc -O1 -o /tmp/pamtest scripts/pamtest.c -lpam     # from this repo
+/tmp/pamtest kde-fingerprint "$USER"    # look at the camera: expect rc=0
 grep -n '^recording_plugin' /etc/howdy/config.ini   # must say pipewire
 ```
 
@@ -61,19 +62,20 @@ The PAM module and python files under `/usr/lib/howdy` are not apk-managed, so a
 upgrade leaves them alone. If you ever need to rebuild them:
 
 ```
-cd ~/code/howdy            # branch pmos-pipewire; the diff is howdy/0001-*.patch here
-meson setup --reconfigure build   # keeps /etc/howdy/config.ini from being overwritten
-sudo ninja -C build install
-grep -n '^recording_plugin' /etc/howdy/config.ini   # if it says opencv, restore howdy/config.ini
+sudo scripts/build-howdy.sh                          # upstream BASE + patches/howdy, from this repo
+grep -n '^recording_plugin' /etc/howdy/config.ini   # must say pipewire
 ```
 
-If `config.ini` got clobbered: `sudo install -m 644 ~/code/trogdor-support/howdy/config.ini /etc/howdy/config.ini`.
+If `config.ini` got clobbered: `./bootstrap.sh --tags face_unlock` writes it again from
+`roles/face_unlock/templates/config.ini.j2`.
 
 ## 2b. Our Howdy patches, and whether you still need them
 
-Howdy here is upstream master d3ab993 (3.0.0 beta, June 2025) plus one local
-patch, `howdy/0001-pipewire-recorder-and-musl-fixes.patch`, kept uncommitted on
-branch `pmos-pipewire` in `~/code/howdy`. It has five parts:
+Howdy here is upstream master at `patches/howdy/BASE` (d3ab993, 3.0.0 beta, June 2025)
+plus the patches in `patches/howdy/`, exported from branch `pmos-pipewire` in
+`$CODE/howdy` (`scripts/patch-refresh.sh howdy` creates that clone). 0001 has the five
+parts below; 0002 adds `[video] detection_threshold`, 0003 makes compare.py log to
+stderr when stdout is not a terminal (needed by `howdy-why`).
 
 | Part | Why we needed it | Still needed if... |
 |---|---|---|
@@ -93,15 +95,13 @@ already describes the symptom; the PipeWire backend is the least likely).
 To see what has changed upstream since our base:
 
 ```
-cd ~/code/howdy && git fetch origin && git log --oneline d3ab993..origin/master
-git diff d3ab993 origin/master -- howdy/src/rubberstamps howdy/src/pam/main.cc howdy/src/recorders
+scripts/patch-refresh.sh howdy               # compares patches/howdy/BASE with upstream master
+git -C $CODE/howdy diff d3ab993 origin/master -- howdy/src/rubberstamps howdy/src/pam/main.cc howdy/src/recorders
 ```
 
-If you do update: `git rebase origin/master` on `pmos-pipewire`, drop any hunk
-upstream made redundant, rebuild per section 2, and regenerate the patch file
-with `git diff > ~/code/trogdor-support/howdy/0001-pipewire-recorder-and-musl-fixes.patch`
-(plus `git diff --no-index /dev/null howdy/src/recorders/pipewire_reader.py >>` the
-same file while that reader is untracked).
+If you do update: `scripts/patch-refresh.sh howdy --dry-run`, then `--apply` (rebases
+`pmos-pipewire` and re-exports `patches/howdy/`), drop any commit upstream made
+redundant, then `--build`.
 
 ## 3. The migration itself
 
@@ -144,8 +144,8 @@ same file while that reader is untracked).
    so a non-existent reader is never mentioned.
 5. Test without locking, then for real:
    ```
-   /tmp/pamtest kde-face jesse          # look, then nod: rc=0. No model -> rc=9, camera error -> rc=7 quickly
-   /tmp/pamtest kde-fingerprint jesse   # now expect a fast failure, it no longer runs Howdy
+   /tmp/pamtest kde-face "$USER"         # look: rc=0. No model -> rc=9, camera error -> rc=7 quickly
+   /tmp/pamtest kde-fingerprint "$USER"  # now expect a fast failure, it no longer runs Howdy
    loginctl lock-session
    ```
    The lock screen should show a face hint (or a selector) instead of the
@@ -160,7 +160,7 @@ me" workarounds would only cause trouble.
 
 The invariants to check, in order:
 
-- Is Howdy fine on its own? `pamtest kde-face jesse` (section 2 builds pamtest).
+- Is Howdy fine on its own? `pamtest kde-face "$USER"` (section 2 builds pamtest).
 - Does the greeter start the `kde-face` service at all? Run the greeter in test
   mode from a terminal in the session, it does real PAM auth in a window and logs
   what it starts:
@@ -176,12 +176,12 @@ The invariants to check, in order:
 
 - Add a second face model for other light/glasses: the launcher entry
   "Howdy: add face" (or `sudo howdy add <label>`).
-- Report the two upstream bugs found here (see section 2b and TLDR section 9): the nod stamp
+- Report the two upstream bugs found here (see section 2b): the nod stamp
   returns the inverted result on timeout (`nod.py`, since 2021) and a crashing
   stamp is skipped and approves (`rubberstamps/__init__.py`), which is what
   happens on every Wayland desktop because `howdy-gtk --start-auth-ui` cannot
   start there. Issue 916 on github.com/boltgolt/howdy already describes the
-  symptom without the security angle. The fixes are in `howdy/0001-*.patch`.
+  symptom without the security angle. The fixes are in `patches/howdy/0001-*.patch`.
 - Consider `certainty` in `/etc/howdy/config.ini` (3.5 now; higher is more lenient).
 
 ## 6. Files this touches, for the record
@@ -191,9 +191,9 @@ The invariants to check, in order:
 | `/etc/pam.d/kde-fingerprint` | currently the Howdy line; restore from `/etc/howdy/kde-fingerprint.pmos-orig` |
 | `/etc/pam.d/kde-face` | new in this migration |
 | `~/.config/kscreenlockerrc` | `[Authenticators] Face=true`; also holds the autolock=false lines from the unattended-boot setup |
-| `/etc/howdy/config.ini` | Howdy settings; pristine copy `howdy/config.ini` here |
-| `/etc/howdy/models/jesse.dat` | enrolled faces (root-owned, world-readable, needed by the greeter which runs as jesse) |
+| `/etc/howdy/config.ini` | Howdy settings; template `roles/face_unlock/templates/config.ini.j2` |
+| `/etc/howdy/models/<user>.dat` | enrolled faces (root-owned, world-readable, needed by the greeter which runs as the user); personal, never copied |
 | `/opt/howdy/venv` | Python with dlib |
 | `/usr/lib/howdy`, `/usr/lib/security/pam_howdy.so`, `/usr/bin/howdy`, `/usr/share/dlib-data` | Howdy install (meson, not apk) |
-| `~/code/howdy` | source, branch `pmos-pipewire` |
-| `~/code/trogdor-support/howdy/` | patch, config, PAM file, pamtest.c, dummy-model.py, this file |
+| `$CODE/howdy` | source, branch `pmos-pipewire` (created by `patch-refresh.sh howdy`) |
+| this repo | `patches/howdy/`, `files/etc/pam.d/kde-fingerprint`, `scripts/pamtest.c`, `scripts/build-howdy.sh`, this file |

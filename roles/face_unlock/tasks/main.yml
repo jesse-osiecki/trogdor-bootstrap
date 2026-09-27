@@ -1,7 +1,7 @@
 ---
 # Howdy face unlock on the Plasma lock screen, built from source with a
 # PipeWire capture backend (nothing is packaged for Alpine). ~15 min on first
-# run (dlib compile + model download). See ~/code/trogdor-support/TLDR.md §9.
+# run (dlib compile + model download). See README "Face unlock".
 - name: Howdy build and runtime dependencies
   ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/apk.yml"
   vars:

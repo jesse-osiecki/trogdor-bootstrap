@@ -59,7 +59,7 @@
   loop: "{{ pipx_tools }}"
   become_user: "{{ device_user }}"
 
-# abuild: build patched aports natively. See ~/code/INDEX.md 1.4.
+# abuild: build patched aports natively (README "Building packages").
 - name: "{{ device_user }} in group abuild (takes effect at next login; use abuild -d until then)"
   ansible.builtin.user:
     name: "{{ device_user }}"
@@ -98,7 +98,7 @@
 
 # Test-kernel safety: dead-man switch and telemetry. The p4 pmOS_kernel_b slot
 # itself is NOT created here (destructive repartition): run
-# scripts/make-kernel-b-partition.sh by hand, see ~/code/INDEX.md 1.10.
+# scripts/make-kernel-b-partition.sh by hand (README "Kernel test slot").
 - name: Managed files (test-kernel scripts and units)
   ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/managed_files.yml"
   vars: { role_name: dev }

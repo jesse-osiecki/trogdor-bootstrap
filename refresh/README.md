@@ -11,7 +11,7 @@ newest upstream release. `patch-refresh.sh all` runs the check for every project
 | `PKG`, `DESC` | package name; one-line purpose used in commit messages |
 | `UP_REPO`, `UP_TRACK`, `UP_PATH` | git clone holding the upstream aport, the ref we follow, the aport path |
 | `OUR_BRANCH` | our aport is a branch of `UP_REPO` (kernel) ... |
-| `OUR_DIR` | ... or a plain directory (the `*-fix/aport/<pkg>` dirs) |
+| `OUR_DIR` | ... or a plain directory in this repo (`aports/<pkg>`, `patches/qmlkonsole`), regenerated and built in place |
 | `PATCH_MODE` | `branch`: rebase a git branch and re-export; `files`: keep the patch files and validate them |
 | `SRC_REPO`, `SRC_BRANCH`, `SRC_BRANCH_FMT`, `SRC_BASE`, `SRC_TAG_FMT` | the source clone, our patch branch (fixed name or `%s`=version), what counts as upstream, the tag naming |
 | `SKIP_IN_UPSTREAM` | drop commits whose subject already exists between the old and new tag |
@@ -24,11 +24,20 @@ newest upstream release. `patch-refresh.sh all` runs the check for every project
 | `EXPORT_DIR`, `BUILD_CMD`, `INSTALL_CMD` | source kind: where patches go, how to build/install |
 | `UP_URL`, `UP_CLONE_ARGS`, `UP_SPARSE` | how to clone the upstream aport repo when `UP_REPO` is missing (sparse dirs for Alpine aports) |
 | `SRC_URL`, `SRC_CLONE_ARGS` | how to clone the source repo when `SRC_REPO` is missing (`%s` = the tag we are on) |
-| `REPO_PATCHES` | the copy of our aport (or patch dir) inside this repo, used to recreate `OUR_DIR`, `OUR_BRANCH` and the patch branch |
+| `REPO_PATCHES` | kernel: the copy of the pmaports package dir in this repo, used to recreate `OUR_BRANCH` and the patch branch in a fresh clone |
 
-Working trees (cloned on demand if missing, override the root with `CODE=`): `~/code/pmaports` (pmOS), `~/code/aports` (Alpine, sparse checkout of the two
-community aports on `3.24-stable`), `~/code/linux` (stable kernel), `~/code/qmlkonsole-fix/qmlkonsole`
-(KDE invent), `~/code/howdy` (GitHub). Alpine's web hosts are not reachable from the tablet;
-git is.
+Upstream clones, all under `$CODE` (default `~/code`), cloned on first use:
+
+| Clone | From | Used by |
+|---|---|---|
+| `$CODE/pmaports` | postmarketOS pmaports (blobless) | kernel (branch `wormdingler-camera` holds our aport), kscreenlocker |
+| `$CODE/aports` | Alpine aports, sparse shallow `3.24-stable` | qmlkonsole, plasma-mobile |
+| `$CODE/linux` | stable kernel (shallow at our tag) | kernel (branch `wormdingler-camera-<ver>` holds our commits) |
+| `$CODE/qmlkonsole` | KDE invent | qmlkonsole (branch `fix/stale-framebuffer`) |
+| `$CODE/howdy` | GitHub | howdy (branch `pmos-pipewire`) |
+
+Missing patch branches are rebuilt from the patch files in this repo, so a fresh clone
+plus network is enough. Alpine's web hosts may be unreachable from a device while git
+works; the script only uses git.
 
 Kernel specifics (patch topics, what `--apply` does step by step, manual rebase): `patches/kernel/README.md`.

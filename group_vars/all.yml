@@ -26,11 +26,11 @@ local_apks:
   - linux-postmarketos-qcom-sc7180-6.18.40-r1.apk
   - qmlkonsole-26.04.2-r4.apk
   - qmlkonsole-lang-26.04.2-r4.apk
-  # plasma-mobile with the lock screen re-arming Howdy on screen wake (~/code/plasma-mobile-fix)
+  # plasma-mobile with the lock screen re-arming Howdy on screen wake (aports/plasma-mobile)
   - plasma-mobile-6.6.6-r1.apk
   - plasma-mobile-lang-6.6.6-r1.apk
   - plasma-mobile-systemd-6.6.6-r1.apk
-  # kscreenlocker re-arming finished non-interactive authenticators (~/code/kscreenlocker-fix)
+  # kscreenlocker re-arming finished non-interactive authenticators (aports/kscreenlocker)
   - kscreenlocker-99996.6.6-r2.apk
   - kscreenlocker-lang-99996.6.6-r2.apk
 
@@ -38,8 +38,9 @@ local_apks:
 # Set both in host_vars (personal; the task is skipped while they are empty).
 git_user_name: ""
 git_user_email: ""
-abuild_srcdest: "{{ device_home }}/code/qmlkonsole-fix/distfiles"
-abuild_repodest: "{{ device_home }}/code/qmlkonsole-fix/packages"
+# abuild's source cache and output repo (sync.sh copies built apks from REPODEST to apks/)
+abuild_srcdest: "{{ device_home }}/.cache/abuild/distfiles"
+abuild_repodest: "{{ device_home }}/packages"
 pipx_tools: [dtschema, b4]
 
 # --- unattended (insecure) ---

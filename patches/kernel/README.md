@@ -13,25 +13,25 @@ with separate upstream destinations; a rebase can drop one without touching the 
 | Patches | Topic | Author(s) | Where it is going | Drop when |
 |---|---|---|---|---|
 | 0001-0005 | drm/msm GPU fixes | Akhil P Oommen | **Not ours.** Shipped by the upstream pmOS aport at `BASE`; they are the aport's own `source=` patches | pmOS drops them |
-| 0006-0022 | Camera bring-up: CAMSS SC7180, CCI binding, gcc clk, ov8856 fixes, DT (CAMSS, CCI0, wormdingler sensors) | George Chan (5), Jesse (12) | One 15-17 patch series to linux-media / arm-msm; drafts in `trogdor-support/upstream/` | the series is in a stable release |
+| 0006-0022 | Camera bring-up: CAMSS SC7180, CCI binding, gcc clk, ov8856 fixes, DT (CAMSS, CCI0, wormdingler sensors) | George Chan (5), Jesse Osiecki (12) | One 15-patch series to linux-media / arm-msm, see "Upstreaming" below | the series is in a stable release |
 | 0023-0028 | i2c-qcom-cci fixes | Vladimir Zapolskiy, Wenmeng Liu, Guangshuo Li | **Already upstream** (7.x); carried only because 6.18 lacks them | the kernel moves past the version that has them (the refresh script drops them by subject match) |
-| 0029-0030 | EC battery charge limit: ACPI battery-hook stubs + `cros_charge-control` without ACPI | Jesse | Separate 2-patch series to linux-pm (power-supply) + linux-acpi; drafts in `trogdor-support/upstream/charge-control/` | the series is in a stable release |
+| 0029-0030 | EC battery charge limit: ACPI battery-hook stubs + `cros_charge-control` without ACPI | Jesse Osiecki | Separate 2-patch series to linux-pm (power-supply) + linux-acpi, see "Upstreaming" below | the series is in a stable release |
 
 Config additions per topic live in `../../scripts/kernel-config-fragment` (commented by topic).
 The kernel config in this directory already has them applied.
 
 Historical naming: the git branch that carries all of ours (0006-0030) is called
-`wormdingler-camera-<version>` (in `~/code/linux`) and the pmaports branch `wormdingler-camera`,
+`wormdingler-camera-<version>` (in `$CODE/linux`) and the pmaports branch `wormdingler-camera`,
 because the camera work came first. The names do not mean "camera only".
 
 ## Where each form of the patches lives
 
 | Form | Location | Role |
 |---|---|---|
-| git commits | `~/code/linux` branch `wormdingler-camera-<ver>` (worktree `~/code/linux-<ver>`), one commit per patch, topics in the order above | where patches are developed and rebased |
+| git commits | `$CODE/linux` branch `wormdingler-camera-<ver>` (optionally a worktree `$CODE/linux-<ver>`), one commit per patch, topics in the order above | where patches are developed and rebased |
 | patch files + APKBUILD + config | pmaports branch `wormdingler-camera`, `device/community/linux-postmarketos-qcom-sc7180/` | what abuild builds |
 | copy of the above | this directory (+ `BASE`) | what a fresh clone of this repo has; the scripts rebuild the two branches from it |
-| upstream drafts | `~/code/trogdor-support/upstream/` (camera), `.../upstream/charge-control/` | what gets mailed, after Jesse's OK |
+| upstream series | generated from the git commits onto linux-next, see "Upstreaming" | what gets mailed |
 
 Tags: `wormdingler-camera/<ver>-r<rel>` on the linux branch and
 `linux-postmarketos-qcom-sc7180-<ver>-r<rel>` on pmaports mark what each built package contained.
@@ -61,27 +61,68 @@ What `--apply` does, so you can judge its output:
    aport's own patches, into the aport; inserts the names before `$_config` in `source=`.
 4. Applies `scripts/kernel-config-fragment` to the upstream config with `scripts/config`
    and runs `olddefconfig`, then `abuild checksum`.
-5. Commits the aport as Jesse, tags both repos, runs `sync.sh` so this directory follows.
+5. Commits the aport with your git identity, tags both repos, runs `sync.sh` so this directory follows.
 
 ### By hand (if the script is unavailable or you distrust it)
 
 Time: about 30 min plus the 2 h build.
 
-1. `git -C ~/code/linux fetch origin tag v<new>` and
-   `git worktree add ~/code/linux-<new> -b wormdingler-camera-<new> wormdingler-camera-<old>`.
+1. `git -C $CODE/linux fetch origin tag v<new>` and
+   `git -C $CODE/linux worktree add $CODE/linux-<new> -b wormdingler-camera-<new> wormdingler-camera-<old>`.
 2. `git rebase --onto v<new> v<old>` in that worktree. For each conflict: if
    `git log --oneline v<old>..v<new> | grep -F "<subject>"` finds it, `git rebase --skip`;
    otherwise fix it, keeping the topic boundaries above.
 3. In pmaports: `git rebase origin/main wormdingler-camera`, resolve the APKBUILD in favour of
    upstream, then delete our old `00xx-*.patch` files and
-   `git -C ~/code/linux-<new> format-patch --no-signature --start-number $((N+1)) -o . v<new>..wormdingler-camera-<new>`
+   `git -C $CODE/linux-<new> format-patch --no-signature --start-number $((N+1)) -o . v<new>..wormdingler-camera-<new>`
    where N is the number of patches upstream's `source=` already lists. Add the new names to
    `source=` before `$_config`, bump `pkgrel`.
 4. Config: for each line in `scripts/kernel-config-fragment`,
-   `~/code/linux-<new>/scripts/config --file config-*.aarch64 --enable|--module NAME`, then
+   `$CODE/linux-<new>/scripts/config --file config-*.aarch64 --enable|--module NAME`, then
    `make ARCH=arm64 LLVM=1 olddefconfig` with that file as `.config` and copy it back.
 5. `abuild checksum && abuild -d`; test with `. scripts/lib-kernel-test.sh; kernel_test_p4 <apk>`.
-6. `./sync.sh`, review, commit as Jesse; tag both repos.
+6. `./sync.sh`, review, commit; tag both repos.
 
 Adding a new topic: commit it at the end of `wormdingler-camera-<ver>`, add its config lines
 to the fragment under its own comment, export as above, and add a row to the table here.
+
+## Upstreaming
+
+The files here are the **postmarketOS build copy** (6.18 stable base, pmaports numbering).
+They are not what gets mailed. An upstream series is generated from the same commits,
+rebased onto linux-next (or the subsystem's `for-next`), with upstream-style changelogs.
+
+How far the two forms drift (measured 2026-09-27 against the v3 camera series prepared
+on next-20260903):
+
+| Topic | Code difference | Message difference |
+|---|---|---|
+| Camera 0006-0022 | Same changes. linux-next needed: regulators as `{ .supply = "..." }` structs, new `CAMSS_6150`/`CAMSS_6350` neighbours in the enums and switch, different DT context lines. 0017-0018 (ov8856 orientation/rotation + its binding) are **dropped**: linux-next already has them. 17 patches become 15. | Upstream messages were rewritten: full wiring description, `[Jesse Osiecki: ...]` notes on George Chan's patches, no `cherry picked from` lines, full name in `Signed-off-by`. |
+| Charge limit 0029-0030 | Identical; applies unchanged to next-20260903. | Identical apart from numbering. |
+| cci fixes 0023-0028 | Not sent: already upstream. | |
+
+Steps for a new submission (per series; about 1 h plus a build and a boot test):
+
+1. Get a linux-next tree: `git -C $CODE/linux fetch https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git tag next-<date>`.
+2. `git -C $CODE/linux worktree add $CODE/linux-next -b <topic>-next next-<date>`, then
+   `git am` the topic's patches from this directory. Resolve the conflicts named in the
+   table above; drop what the table says is already there.
+3. Rewrite each changelog for upstream (`git rebase -i`, reword). Keep other authors'
+   `From:` and `Signed-off-by:`; describe your changes to their patches in a
+   `[Name: ...]` note above your own `Signed-off-by:`.
+4. Check: `./scripts/checkpatch.pl --strict`, `make dt_binding_check` and `make dtbs_check`
+   for binding/DT patches, a build of every commit, and a boot of the result
+   (`scripts/build-kpart.sh --flash <disk>p4` from this repo, then the p4 test flow).
+5. Recipients: `./scripts/get_maintainer.pl` over the series; add George Chan
+   `<gchan9527@gmail.com>` in Cc for the camera series (co-author).
+6. `git format-patch -v<N> --cover-letter --base=auto` and a dry run with
+   `git send-email --dry-run` (or `b4 send --dry-run`) before the real send.
+
+Contribution policies to check before sending anything:
+
+- Linux: `Documentation/process/submitting-patches.rst` (DCO: `Signed-off-by` is a
+  personal statement) and `Documentation/process/coding-assistants.rst` (disclosure
+  rules for tool-assisted work). Which tags a submission carries is the submitter's call.
+- postmarketOS: its contributing policy forbids contributions created with generative-AI
+  tools. Read it before proposing anything from this repo to pmaports; the config-only
+  change (three `=m` options) is small enough to write by hand.

@@ -4,16 +4,17 @@
 #   - manifest.txt files: copied from the live system into files/
 #   - patches/kernel:     the pmaports package directory from the camera branch (+ BASE)
 #   - patches/howdy:      format-patch of the pmos-pipewire branch
-#   - patches/qmlkonsole: the aport directory
-#   - apks/:              built packages named in group_vars (not in git)
-#   - files/etc/apk/world.snapshot: reference package list
+#   - apks/:              built packages from abuild's REPODEST (not in git)
+# The kernel and howdy branches live in clones under $CODE (default ~/code) that
+# scripts/patch-refresh.sh creates; missing clones are skipped. The other aports
+# (aports/, patches/qmlkonsole) are edited and built in this repo directly.
 set -eu
 cd "$(dirname "$0")"
 CODE=${CODE:-$HOME/code}
 PMAPORTS=${PMAPORTS:-$CODE/pmaports}; PMAPORTS_BRANCH=wormdingler-camera; PMAPORTS_BASE=origin/main
 KPKG=device/community/linux-postmarketos-qcom-sc7180
 HOWDY=${HOWDY:-$CODE/howdy}; HOWDY_BRANCH=pmos-pipewire; HOWDY_BASE=origin/master
-QMLK=${QMLK:-$CODE/qmlkonsole-fix}
+REPODEST=${REPODEST:-$(sed -n 's/^REPODEST=//p' "$HOME/.abuild/abuild.conf" 2>/dev/null)}
 
 say() { printf '==> %s\n' "$*"; }
 
@@ -30,7 +31,6 @@ grep -vE '^\s*(#|$)' manifest.txt | while read -r role mode path; do
 		echo "   MISSING everywhere: $path" >&2
 	fi
 done
-cp /etc/apk/world files/etc/apk/world.snapshot 2>/dev/null || true
 
 say "kernel: $PMAPORTS $PMAPORTS_BRANCH"
 if git -C "$PMAPORTS" rev-parse -q --verify "$PMAPORTS_BRANCH" >/dev/null; then
@@ -53,16 +53,9 @@ else
 	echo "   branch not found, skipped" >&2
 fi
 
-say "qmlkonsole: $QMLK/aport/qmlkonsole"
-if [ -d "$QMLK/aport/qmlkonsole" ]; then
-	rm -rf patches/qmlkonsole && mkdir -p patches/qmlkonsole
-	cp "$QMLK"/aport/qmlkonsole/APKBUILD "$QMLK"/aport/qmlkonsole/*.patch patches/qmlkonsole/
-	echo "   pkgrel $(grep ^pkgrel= patches/qmlkonsole/APKBUILD)"
-fi
-
-say "apks -> apks/ (gitignored)"
+say "apks: ${REPODEST:-<no REPODEST in ~/.abuild/abuild.conf>} -> apks/ (gitignored)"
 mkdir -p apks
-for f in $(find "$QMLK/packages" -name '*.apk' 2>/dev/null); do
+for f in $( [ -n "$REPODEST" ] && find "$REPODEST" -name '*.apk' 2>/dev/null); do
 	cp -u "$f" apks/
 done
 ls apks/*.apk 2>/dev/null | sed 's|^|   |' || true
