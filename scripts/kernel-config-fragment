@@ -1,6 +1,8 @@
-# Kernel config additions for the wormdingler camera package, applied by
-# kernel-refresh.sh on top of upstream pmaports' config-postmarketos-qcom-sc7180.aarch64
-# (name=y|m|n, or name=value). CAMSS itself is already built in the pmOS config.
+# Kernel config additions for the wormdingler kernel package, applied by
+# patch-refresh.sh kernel on top of upstream pmaports' config-postmarketos-qcom-sc7180.aarch64
+# (name=y|m|n, or name=value). One block per topic, see patches/kernel/README.md.
+
+# Camera series (patches 0006-0022). CAMSS itself is already built in the pmOS config.
 CONFIG_VIDEO_OV5675=m
 CONFIG_VIDEO_OV8856=m
 CONFIG_VIDEO_DW9714=m

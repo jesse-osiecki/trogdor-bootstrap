@@ -63,7 +63,7 @@ Where the patches live:
 
 | Project | Patches | Upstream followed |
 |---|---|---|
-| kernel | branch `wormdingler-camera-<ver>` in `~/code/linux` | pmaports `origin/main` + stable tag |
+| kernel | branch `wormdingler-camera-<ver>` in `~/code/linux` (camera series + EC charge limit, see `patches/kernel/README.md`) | pmaports `origin/main` + stable tag |
 | qmlkonsole | branch `fix/stale-framebuffer` in `~/code/qmlkonsole-fix/qmlkonsole` + 2 loose patches | Alpine aports `3.24-stable` + KDE tag |
 | kscreenlocker, plasma-mobile | patch files in `*-fix/aport/` | pmaports `origin/v26.06`, Alpine `3.24-stable` |
 | howdy | branch `pmos-pipewire` in `~/code/howdy`, exported to `patches/howdy/` | GitHub master |
@@ -86,7 +86,7 @@ Rule: edit in the working tree or in this repo, apply with `bootstrap.sh`, never
 ```
 manifest.txt        whole files managed verbatim: <role> <mode> <path>
 files/              mirror of those paths, pulled from the live system by sync.sh (~ -> files/HOME/)
-patches/kernel/     pmaports package dir from branch wormdingler-camera (+ BASE commit)
+patches/kernel/     pmaports package dir from branch wormdingler-camera (+ BASE commit); README.md maps patches to topics and explains the rebase
 patches/howdy/      format-patch of ~/code/howdy branch pmos-pipewire (+ BASE commit)
 patches/qmlkonsole/ the aport (APKBUILD + patches) from ~/code/qmlkonsole-fix
 aports/             APKBUILD + patch for plasma-mobile and kscreenlocker
@@ -102,7 +102,8 @@ docs/               PLASMA-6.8-MIGRATION.md: runbook for moving face unlock to P
 ## Building the kernel package by hand
 
 `patches/kernel/linux-postmarketos-qcom-sc7180/` is the full pmaports package directory
-(APKBUILD, config, 30 patches, 25 of them ours: 23 camera, 2 EC charge limit), taken at the commit in `BASE`.
+(APKBUILD, config, 30 patches: 5 upstream pmOS, 17 camera, 6 already-upstream cci fixes, 2 EC charge limit;
+see `patches/kernel/README.md`), taken at the commit in `BASE`.
 
 1. In a pmaports checkout at that commit, copy the directory over `device/community/linux-postmarketos-qcom-sc7180`.
 2. `cd` into it, `abuild checksum && abuild -d` (abuild gotchas: `~/code/INDEX.md` 1.4).

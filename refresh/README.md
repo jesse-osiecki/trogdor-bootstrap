@@ -30,3 +30,5 @@ Working trees (cloned on demand if missing, override the root with `CODE=`): `~/
 community aports on `3.24-stable`), `~/code/linux` (stable kernel), `~/code/qmlkonsole-fix/qmlkonsole`
 (KDE invent), `~/code/howdy` (GitHub). Alpine's web hosts are not reachable from the tablet;
 git is.
+
+Kernel specifics (patch topics, what `--apply` does step by step, manual rebase): `patches/kernel/README.md`.
