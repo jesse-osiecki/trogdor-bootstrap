@@ -204,7 +204,15 @@ echo "target:   $NEWVER"
 apk policy "$PKG" 2>/dev/null | grep -B1 'http' | grep -vE 'http|--' | sed 's/^ *//; s/:$//; s/^/repo has: /' | head -2
 BASEFILE=${OUR_DIR:+$OUR_DIR/.refresh-base}
 BASEREF=$( [ -n "$OUR_BRANCH" ] && git -C "$UP_REPO" merge-base "$OUR_BRANCH" "$UP_TRACK" || cat "$BASEFILE" 2>/dev/null || echo "$UP_TRACK")
-APORT_CHANGED=$(git -C "$UP_REPO" log --oneline "$BASEREF..$UP_TRACK" -- "$UP_PATH" 2>/dev/null | wc -l)
+# A fresh shallow clone lacks the recorded base: fetch it by id (a lazy fetch inside git log
+# would stall), then compare the aport's tree at base and upstream, which needs no history.
+GIT_NO_LAZY_FETCH=1 git -C "$UP_REPO" cat-file -e "$BASEREF^{commit}" 2>/dev/null || git -C "$UP_REPO" fetch -q --depth=1 --filter=blob:none origin "$BASEREF" 2>/dev/null || true
+if [ "$(GIT_NO_LAZY_FETCH=1 git -C "$UP_REPO" rev-parse -q --verify "$BASEREF:$UP_PATH" 2>/dev/null)" = "$(git -C "$UP_REPO" rev-parse "$UP_TRACK:$UP_PATH")" ]; then
+	APORT_CHANGED=0
+else
+	APORT_CHANGED=$(GIT_NO_LAZY_FETCH=1 git -C "$UP_REPO" log --oneline "$BASEREF..$UP_TRACK" -- "$UP_PATH" 2>/dev/null | wc -l)
+	[ "$APORT_CHANGED" -gt 0 ] || APORT_CHANGED="1+"   # history too shallow to count
+fi
 echo "upstream aport commits since our base: $APORT_CHANGED"
 if [ "$NEWVER" = "$OURVER" ] && [ "$APORT_CHANGED" = 0 ] && [ "$FORCE" = 0 ] && [ "$MODE" != build ] && [ "$MODE" != test ] && [ "$MODE" != install ]; then
 	echo "nothing new (use --force to regenerate anyway)"; exit 0
