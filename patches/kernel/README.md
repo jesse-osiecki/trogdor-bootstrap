@@ -1,8 +1,9 @@
 # patches/kernel: the local kernel patch set for google-trogdor wormdingler
 
 `linux-postmarketos-qcom-sc7180/` is the complete pmaports package directory
-(APKBUILD, config, patches) as it exists on pmaports branch `wormdingler-camera`, taken
-against the pmaports `origin/main` commit recorded in `BASE`. `sync.sh` regenerates it;
+(APKBUILD, config, patches) as it exists on pmaports branch `wormdingler-camera`. `BASE` is the
+pmaports `main` commit that branch is based on (its merge-base with `origin/main`), so
+`git diff BASE..wormdingler-camera -- device/community/linux-postmarketos-qcom-sc7180` is exactly our change. `sync.sh` regenerates it;
 never edit the files here by hand.
 
 ## The patches are four independent topics, not one

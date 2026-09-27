@@ -37,7 +37,7 @@ if git -C "$PMAPORTS" rev-parse -q --verify "$PMAPORTS_BRANCH" >/dev/null; then
 	rm -rf patches/kernel/linux-postmarketos-qcom-sc7180
 	mkdir -p patches/kernel/linux-postmarketos-qcom-sc7180
 	git -C "$PMAPORTS" archive "$PMAPORTS_BRANCH" "$KPKG" | tar -x --strip-components=3 -C patches/kernel/linux-postmarketos-qcom-sc7180
-	git -C "$PMAPORTS" rev-parse "$PMAPORTS_BASE" > patches/kernel/BASE
+	git -C "$PMAPORTS" merge-base "$PMAPORTS_BASE" "$PMAPORTS_BRANCH" > patches/kernel/BASE   # the pmaports commit our branch sits on, not the tip
 	echo "   $(ls patches/kernel/linux-postmarketos-qcom-sc7180/*.patch | wc -l) kernel patches, pmaports base $(cut -c1-9 patches/kernel/BASE)"
 else
 	echo "   branch not found, skipped" >&2
