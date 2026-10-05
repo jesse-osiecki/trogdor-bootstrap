@@ -182,7 +182,8 @@ roles/*/templates/  files with device-specific values
 group_vars/all.yml  every parameter with its default; host_vars overrides per device
 inventory/          *.example only; real hosts.yml and host_vars are gitignored
 scripts/            patch-refresh.sh, lib-kernel-test.sh, build-kpart.sh, make-kernel-b-partition.sh,
-                    build-howdy.sh, pamtest.c, librewolf-ua-test.sh, fake-boot-deploy/
+                    build-howdy.sh, pamtest.c, librewolf-ua-test.sh, fake-boot-deploy/,
+                    ec-charge-control.py (EC charge mode and battery sustainer bounds)
 docs/               PLASMA-6.8-MIGRATION.md: moving face unlock to Plasma 6.8's native slot
 ```
 
