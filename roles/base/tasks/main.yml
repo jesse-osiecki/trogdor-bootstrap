@@ -4,7 +4,7 @@
   vars:
     apk_packages: [bash, keyd, cros-keyboard-map, libcamera-tools, pipewire-tools, librewolf, mobile-config-firefox]
 
-- name: Managed files (sleep LED hook, sysctl, accel udev rule, libcamera tuning, LibreWolf overrides)
+- name: Managed files (sleep LED hook, sysctl, accel udev rule, libcamera tuning, LibreWolf overrides, battery charge limit)
   ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/managed_files.yml"
   vars: { role_name: base }
 
@@ -53,6 +53,22 @@
     path: /etc/deviceinfo
     regexp: '^deviceinfo_zram_swap_pct='
     line: 'deviceinfo_zram_swap_pct="{{ zram_swap_pct }}"'
+
+# Battery charge limit: the kernel driver (patches 0029-0030) resets the EC to "no limit"
+# on every probe and PowerDevil does not store the value, so a oneshot service re-applies it
+# when the battery appears (udev rule) and at boot. See README "What each fix does".
+- name: Battery charge limit {{ battery_charge_limit }}% (100 = off)
+  ansible.builtin.copy:
+    dest: /etc/battery-charge-limit.conf
+    content: "LIMIT={{ battery_charge_limit }}\n"
+    mode: "0644"
+  notify: apply battery charge limit
+
+- name: battery-charge-limit.service enabled
+  ansible.builtin.systemd:
+    name: battery-charge-limit.service
+    enabled: true
+    daemon_reload: true
 
 - name: Locally built packages present in apks/
   ansible.builtin.stat:

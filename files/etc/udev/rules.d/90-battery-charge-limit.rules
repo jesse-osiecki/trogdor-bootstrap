@@ -1,0 +1,4 @@
+# Re-apply the configured battery charge limit when a system battery appears (the
+# cros_charge-control driver clears the EC's limit on probe). The service is oneshot with
+# RemainAfterExit, so it runs once per boot however many power_supply events follow.
+ACTION=="add", SUBSYSTEM=="power_supply", ENV{POWER_SUPPLY_TYPE}=="Battery", TAG+="systemd", ENV{SYSTEMD_WANTS}+="battery-charge-limit.service"

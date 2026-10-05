@@ -21,6 +21,10 @@ keyd_keyboard_hash: eb4bc35f
 # (name-only hash, phys is empty, so it should be the same on every trogdor unit).
 keyd_ec_buttons_hash: c68a2d8e
 zram_swap_pct: "200"
+# Battery charge limit in percent, applied at every boot by battery-charge-limit.service
+# (the cros_charge-control driver resets the EC on probe, PowerDevil does not persist it).
+# 100 = off. Needs the kernel with patches 0029-0030 (6.18.40-r2+); harmless without it.
+battery_charge_limit: 80
 # Locally built packages to install from apks/ (empty = skip).
 local_apks:
   - linux-postmarketos-qcom-sc7180-6.18.40-r1.apk

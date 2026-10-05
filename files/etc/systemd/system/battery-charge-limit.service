@@ -1,0 +1,11 @@
+[Unit]
+Description=Apply the configured battery charge limit (the EC driver resets it at every boot)
+Documentation=file:/usr/local/sbin/battery-charge-limit
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/battery-charge-limit
+
+[Install]
+WantedBy=multi-user.target

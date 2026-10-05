@@ -1,0 +1,25 @@
+#!/bin/sh
+# Apply the battery charge limit from /etc/battery-charge-limit.conf (LIMIT=<percent>,
+# 100 = off) to every system battery that offers charge_control_end_threshold.
+# Why: the cros_charge-control driver resets the EC to "no limit" every time it probes, and
+# PowerDevil does not store the value, so without this the limit is gone after a reboot.
+# Started by udev (90-battery-charge-limit.rules) when a battery appears, and at boot.
+LIMIT=100
+[ -r /etc/battery-charge-limit.conf ] && . /etc/battery-charge-limit.conf
+case "$LIMIT" in ''|100) echo "battery-charge-limit: no limit configured (LIMIT=$LIMIT)"; exit 0;; esac
+case "$LIMIT" in *[!0-9]*) echo "battery-charge-limit: bad LIMIT '$LIMIT'" >&2; exit 1;; esac
+# The attribute comes from a power-supply extension that attaches a moment after the battery.
+i=0; while [ $i -lt 60 ]; do
+	set -- /sys/class/power_supply/*/charge_control_end_threshold
+	[ -e "$1" ] && break
+	sleep 1; i=$((i + 1))
+done
+done_any=0
+for f in "$@"; do
+	[ -e "$f" ] || continue
+	d=${f%/*}; [ "$(cat "$d/type" 2>/dev/null)" = Battery ] || continue
+	if echo "$LIMIT" > "$f"; then echo "battery-charge-limit: ${d##*/} limited to $LIMIT%"; done_any=1
+	else echo "battery-charge-limit: ${d##*/} rejected $LIMIT" >&2; fi
+done
+[ $done_any = 1 ] || echo "battery-charge-limit: no battery offers charge_control_end_threshold (kernel without cros_charge-control?)" >&2
+exit 0

@@ -11,3 +11,9 @@
 
 - name: reload keyd
   ansible.builtin.command: keyd reload
+
+- name: apply battery charge limit
+  ansible.builtin.systemd:
+    name: battery-charge-limit.service
+    state: restarted
+    daemon_reload: true
