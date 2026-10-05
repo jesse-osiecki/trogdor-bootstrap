@@ -102,6 +102,16 @@ on next-20260903):
 | Charge limit 0029-0030 | Identical; applies unchanged to next-20260903. | Identical apart from numbering. |
 | cci fixes 0023-0028 | Not sent: already upstream. | |
 
+Current state (2026-09-27): both series sit on mainline `v7.3-rc4` as branches of
+github.com/jesse-osiecki/linux: `sc7180-camss` (15 commits) and `cros-charge-control`
+(2 commits). Done: checkpatch --strict (0 errors), `dt_binding_check` and `CHECK_DTBS=y`
+clean, every commit builds on its own with `W=1`. Nothing has been mailed. Left:
+
+1. Boot test the rc4 branch on the device (p4 test slot): both cameras stream, the charge
+   limit works, then `sudo kernel-keep`.
+2. Just before sending, rebase a copy onto the newest linux-next and rebuild (step 2 below).
+3. Steps 5-6 below (recipients, format-patch with "Changes since v3", dry run, send).
+
 Steps for a new submission (per series; about 1 h plus a build and a boot test):
 
 1. Get a linux-next tree: `git -C $CODE/linux fetch https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git tag next-<date>`.
