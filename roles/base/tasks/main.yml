@@ -55,13 +55,16 @@
     line: 'deviceinfo_zram_swap_pct="{{ zram_swap_pct }}"'
 
 # Battery charge limit: the kernel driver (patches 0029-0030) resets the EC to "no limit"
-# on every probe and PowerDevil does not store the value, so a oneshot service re-applies it
-# when the battery appears (udev rule) and at boot. See README "What each fix does".
-- name: Battery charge limit {{ battery_charge_limit }}% (100 = off)
+# on every probe and PowerDevil only reads/writes sysfs, so a oneshot service applies the
+# saved value at boot (and when udev sees the battery) and saves the current one at shutdown.
+# The variable only seeds the file (force: false): afterwards Plasma's GUI owns the value,
+# like firmware would. See README "What each fix does".
+- name: Battery charge limit default {{ battery_charge_limit }}% (100 = off; seeds the file once)
   ansible.builtin.copy:
     dest: /etc/battery-charge-limit.conf
     content: "LIMIT={{ battery_charge_limit }}\n"
     mode: "0644"
+    force: false
   notify: apply battery charge limit
 
 - name: battery-charge-limit.service enabled

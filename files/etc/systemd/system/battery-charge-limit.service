@@ -1,11 +1,12 @@
 [Unit]
-Description=Apply the configured battery charge limit (the EC driver resets it at every boot)
+Description=Battery charge limit: apply at boot, save what the GUI set at shutdown
 Documentation=file:/usr/local/sbin/battery-charge-limit
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/local/sbin/battery-charge-limit
+ExecStop=/usr/local/sbin/battery-charge-limit save
 
 [Install]
 WantedBy=multi-user.target

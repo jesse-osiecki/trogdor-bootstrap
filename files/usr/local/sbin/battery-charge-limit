@@ -1,23 +1,37 @@
 #!/bin/sh
-# Apply the battery charge limit from /etc/battery-charge-limit.conf (LIMIT=<percent>,
-# 100 = off) to every system battery that offers charge_control_end_threshold.
+# Battery charge limit that survives reboots, the way laptop firmware would keep it.
+#   battery-charge-limit        apply LIMIT from /etc/battery-charge-limit.conf to every
+#                               system battery that offers charge_control_end_threshold
+#   battery-charge-limit save   write the current sysfs value back to the config file
 # Why: the cros_charge-control driver resets the EC to "no limit" every time it probes, and
-# PowerDevil does not store the value, so without this the limit is gone after a reboot.
-# Started by udev (90-battery-charge-limit.rules) when a battery appears, and at boot.
+# PowerDevil (Plasma's GUI) only reads and writes sysfs, it stores nothing. So the service
+# applies the file at boot (and when udev sees the battery) and saves the file at shutdown,
+# which makes whatever was last set in the GUI the value that comes back. 100 = no limit.
+CONF=/etc/battery-charge-limit.conf
+
+batteries() {
+	for f in /sys/class/power_supply/*/charge_control_end_threshold; do
+		[ -e "$f" ] || continue
+		[ "$(cat "${f%/*}/type" 2>/dev/null)" = Battery ] && echo "$f"
+	done
+}
+
+if [ "$1" = save ]; then
+	f=$(batteries | head -n1); [ -n "$f" ] || exit 0
+	v=$(cat "$f"); case "$v" in ''|*[!0-9]*) exit 0;; esac
+	printf 'LIMIT=%s\n' "$v" > "$CONF"; echo "battery-charge-limit: saved $v% to $CONF"
+	exit 0
+fi
+
 LIMIT=100
-[ -r /etc/battery-charge-limit.conf ] && . /etc/battery-charge-limit.conf
+[ -r "$CONF" ] && . "$CONF"
 case "$LIMIT" in ''|100) echo "battery-charge-limit: no limit configured (LIMIT=$LIMIT)"; exit 0;; esac
-case "$LIMIT" in *[!0-9]*) echo "battery-charge-limit: bad LIMIT '$LIMIT'" >&2; exit 1;; esac
+case "$LIMIT" in *[!0-9]*) echo "battery-charge-limit: bad LIMIT '$LIMIT' in $CONF" >&2; exit 1;; esac
 # The attribute comes from a power-supply extension that attaches a moment after the battery.
-i=0; while [ $i -lt 60 ]; do
-	set -- /sys/class/power_supply/*/charge_control_end_threshold
-	[ -e "$1" ] && break
-	sleep 1; i=$((i + 1))
-done
+i=0; while [ $i -lt 60 ] && [ -z "$(batteries)" ]; do sleep 1; i=$((i + 1)); done
 done_any=0
-for f in "$@"; do
-	[ -e "$f" ] || continue
-	d=${f%/*}; [ "$(cat "$d/type" 2>/dev/null)" = Battery ] || continue
+for f in $(batteries); do
+	d=${f%/*}
 	if echo "$LIMIT" > "$f"; then echo "battery-charge-limit: ${d##*/} limited to $LIMIT%"; done_any=1
 	else echo "battery-charge-limit: ${d##*/} rejected $LIMIT" >&2; fi
 done
