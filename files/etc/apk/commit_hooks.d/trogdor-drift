@@ -1,0 +1,36 @@
+#!/bin/sh
+# apk commit hook (trogdor-bootstrap, role base): say when an apk transaction
+# touches a file this device customises, stay silent otherwise.
+#
+# apk never overwrites a locally changed file under a protected path (/etc by
+# default, plus the dirs in /etc/apk/protected_paths.d/*); it keeps ours and
+# drops the package's copy next to it as <file>.apk-new. So the questions after
+# any commit are: did a new .apk-new appear, and did a locally changed file
+# (`U` in `apk audit`) change under us? apk cannot be called from post-commit
+# (the database is still locked and a nested `apk audit` prints nothing), so
+# pre-commit records the answers' baseline and post-commit checks with plain
+# tools. Costs well under a second; prints nothing when no customised file moved.
+run=/run/apk-drift
+dirs="/etc $(sed -n 's|^+|/|p' /etc/apk/protected_paths.d/*.list 2>/dev/null | tr '\n' ' ')"
+case "$1" in
+pre-commit)
+	umask 077; rm -rf "$run"; mkdir -p "$run"
+	apk audit > "$run/audit" 2>/dev/null || { rm -rf "$run"; exit 0; }
+	find $dirs -name '*.apk-new' 2>/dev/null | sort > "$run/apk-new"
+	sed -n 's|^U |/|p' "$run/audit" | while read -r f; do
+		[ -f "$f" ] && [ ! -L "$f" ] && sha256sum "$f"
+	done > "$run/sums" 2>/dev/null ;;
+post-commit)
+	[ -f "$run/apk-new" ] || exit 0
+	new=$(find $dirs -name '*.apk-new' 2>/dev/null | sort | diff "$run/apk-new" - | sed -n 's|^> ||p')
+	replaced=$(sha256sum -c "$run/sums" 2>/dev/null | sed -n 's|: FAILED.*||p')
+	rm -rf "$run"
+	[ -n "$new$replaced" ] || exit 0
+	{
+		echo "trogdor: this apk commit touched locally customised files:"
+		for f in $new;      do echo "  new package version to merge:   $f"; done
+		for f in $replaced; do echo "  local edit replaced by package: $f"; done
+		echo "  next: trogdor-bootstrap/check.sh, then merge or delete each .apk-new"
+	} >&2 ;;
+esac
+exit 0

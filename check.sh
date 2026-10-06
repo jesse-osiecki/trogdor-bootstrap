@@ -44,15 +44,22 @@ say "3. apk audit: package-owned files modified under /etc (U = changed)"
 audit=$(if sudo -n true 2>/dev/null; then sudo apk audit; else apk audit 2>/dev/null; fi)
 printf '%s\n' "$audit" | grep '^U ' | grep -vE ' etc/(passwd|shadow|group|hosts|hostname|fstab|mtab|shells|tuned/|modprobe.d/tuned)' | sed 's/^/   /'
 sudo -n true 2>/dev/null || echo "   (partial: run with passwordless sudo for a full audit)"
+# apk keeps our copy of a protected file and leaves the package's as <file>.apk-new;
+# apk audit does not list those, so look for them (the commit hook
+# /etc/apk/commit_hooks.d/trogdor-drift reports new ones at upgrade time)
+protected="/etc $(sed -n 's|^+|/|p' /etc/apk/protected_paths.d/*.list 2>/dev/null | tr '\n' ' ')"
+apknew=$(if sudo -n true 2>/dev/null; then sudo find $protected -name '*.apk-new'; else find $protected -name '*.apk-new' 2>/dev/null; fi)
+if [ -n "$apknew" ]; then printf '%s\n' "$apknew" | sed 's|^|   MERGE   |'; echo "           merge or delete each .apk-new"; rc=1; fi
 
 say "4. unmanaged local files"
 # Paths written by templates/tasks rather than the manifest:
 known="/etc/sudoers.d/$(id -un)-nopasswd /etc/mkinitfs/files-extra/00-luks-autounlock.files"
-for d in /usr/local/sbin /usr/local/bin /usr/lib/systemd/system-sleep /etc/sysctl.d /etc/sudoers.d /etc/mkinitfs/hooks-extra /etc/mkinitfs/files-extra; do
+for d in /usr/local/sbin /usr/local/bin /usr/lib/systemd/system-sleep /etc/sysctl.d /etc/sudoers.d /etc/mkinitfs/hooks-extra /etc/mkinitfs/files-extra /etc/apk/commit_hooks.d /etc/apk/protected_paths.d; do
 	[ -d "$d" ] || continue
 	for f in "$d"/*; do
 		[ -f "$f" ] || continue
 		case "$f" in /etc/keyd/default.conf.bak-*) continue;; esac
+		apk info -W "$f" >/dev/null 2>&1 && continue   # package-owned, apk's business
 		grep -q " $f\$" manifest.txt || case " $known " in *" $f "*) ;; *) echo "   unmanaged $f";; esac
 	done
 done

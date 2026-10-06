@@ -1,0 +1,3 @@
+# trogdor-bootstrap (role base): libcamera tuning files we ship by hand live here;
+# protect them like /etc so a libcamera upgrade leaves .apk-new instead of overwriting.
++usr/share/libcamera/ipa/simple

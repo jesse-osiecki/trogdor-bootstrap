@@ -64,6 +64,7 @@ credentials.
 | Terminal fills with stale pixels | qmlkonsole repaint bugs at fractional scale 1.25 on the 1200x2000 panel | `patches/qmlkonsole/` (framebuffer repaint + truncated content rect; the scroll-latch patch is parked, not reproduced on master) | base (apk) |
 | LibreWolf shows the desktop UI | the `mobile-config-firefox-librewolf` stub replaces `librewolf.cfg` and with it LibreWolf's privacy defaults | stub removed; `files/HOME/.config/librewolf/.../librewolf.overrides.cfg` loads mobile-config-firefox from inside `librewolf.cfg`; fingerprinting protection with the UA exempt. Check: `scripts/librewolf-ua-test.sh` (40 s, expect `Mobile;` in the UA) | base |
 | Face unlock | nothing packaged; the cameras exist only behind libcamera/PipeWire | Howdy + `patches/howdy/`, see "Face unlock" | face_unlock |
+| Does `apk upgrade` undo any of this? | apk keeps a locally changed file under a protected path and drops the package's copy as `<file>.apk-new`; `/usr` is not protected, so the libcamera tuning stubs could be overwritten silently | `files/etc/apk/protected_paths.d/trogdor.list` protects `/usr/share/libcamera/ipa/simple`; the commit hook `files/etc/apk/commit_hooks.d/trogdor-drift` prints the `.apk-new` files a commit leaves behind (and any customised file it replaced) and says nothing otherwise. Locally built packages are checksum-pinned in `/etc/apk/world`, so upgrades skip them | base |
 | First unlock after sleep needs a PIN | plasma-mobile's lock screen never re-arms the fingerprint slot on wake, and kscreenlocker ignores re-arm calls after a finished non-interactive run | `aports/plasma-mobile` (`onDpmsTurnedOn` re-arm) + `aports/kscreenlocker` (restart finished authenticators) | face_unlock (apk) |
 
 Known leftovers: closing the cover on an already sleeping tablet wakes it (PowerDevil
@@ -167,6 +168,7 @@ Rule: edit in the working tree or in this repo, apply with `bootstrap.sh`, never
 3. New whole file: add its path to `manifest.txt` under its role, run `./sync.sh`.
 4. Value that differs per device: default in `group_vars/all.yml` + a template.
 5. Package-owned file (like `/etc/keyd/default.conf`): a `lineinfile` task, never a copy, so apk upgrades don't fight it.
+6. After `apk upgrade`: the commit hook speaks up only if a customised file got a `.apk-new` or was replaced; then `./check.sh` (it lists them as MERGE), merge, delete the `.apk-new`.
 
 ## Layout
 
