@@ -1,0 +1,134 @@
+From a0ae3dc5858e61467822ab0c16500efcf375e610 Mon Sep 17 00:00:00 2001
+From: Jesse Osiecki <jesse@jjo.ninja>
+Date: Tue, 6 Oct 2026 01:41:42 -0400
+Subject: [PATCH] power: supply: cros_charge-control: Take over the state the
+ EC kept
+
+The EC is a separate microcontroller that stays powered while the AP
+reboots, and it keeps its charge control state. The driver nevertheless
+resets the EC to "no limit" on every probe, so a charge limit is lost on
+every reboot of the OS. Userspace such as PowerDevil only reads and
+writes the sysfs attributes and relies on the platform to remember the
+value, which ACPI laptops do through their firmware. On ChromeOS
+devices the EC does remember; the driver just throws it away.
+
+Since v2 the command can report the current state, so read it once at
+probe and seed the cached values from it. Only fall back to resetting
+the EC when the EC cannot report (v1) or the reply makes no sense.
+
+The reported mode is the EC's runtime mode: with the sustainer
+configured the EC itself cycles through NORMAL, IDLE and DISCHARGE to
+hold the state of charge inside the band. A configured sustainer is
+therefore reported as "auto" with the thresholds, and the mode is only
+mapped to inhibit-charge or force-discharge when the sustainer is off.
+
+Tested on a Lenovo IdeaPad Duet 3 (google-trogdor wormdingler): set an
+80 % limit, reboot into a kernel without the driver, the EC still holds
+80/80; loading the driver then shows charge_control_end_threshold = 80
+without any write.
+
+Signed-off-by: Jesse Osiecki <jesse@jjo.ninja>
+---
+ drivers/power/supply/cros_charge-control.c | 75 ++++++++++++++++++++--
+ 1 file changed, 70 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/power/supply/cros_charge-control.c b/drivers/power/supply/cros_charge-control.c
+index 2aea2dbbce..a847db9f13 100644
+--- a/drivers/power/supply/cros_charge-control.c
++++ b/drivers/power/supply/cros_charge-control.c
+@@ -24,8 +24,8 @@
+ /*
+  * Semantics of data *returned* from the EC API and Linux sysfs differ
+  * slightly, also the v1 API can not return any data.
+- * To match the expected sysfs API, data is never read back from the EC but
+- * cached in the driver.
++ * To match the expected sysfs API, data is read back from the EC only once,
++ * at probe (v2 and later), and cached in the driver from then on.
+  *
+  * Changes to the EC bypassing the driver will not be reflected in sysfs.
+  * Any change to "charge_behaviour" will synchronize the EC with the driver state.
+@@ -99,6 +99,66 @@ static int cros_chctl_configure_ec(struct cros_chctl_priv *priv)
+ 	return cros_chctl_send_charge_control_cmd(priv->cros_ec, priv->cmd_version, &req);
+ }
+ 
++/*
++ * The EC keeps its charge control state while the AP reboots, so a limit set
++ * before a reboot is still active. Take it over instead of wiping it, like
++ * ACPI platforms read their firmware-persisted thresholds.
++ *
++ * The reported mode is the EC's *runtime* mode: with the sustainer configured
++ * the EC itself switches between NORMAL, IDLE and DISCHARGE to keep the
++ * state of charge inside the band, so a configured sustainer means "auto"
++ * whatever the mode says.
++ */
++static int cros_chctl_read_ec(struct cros_chctl_priv *priv)
++{
++	struct ec_params_charge_control req = { .cmd = EC_CHARGE_CONTROL_CMD_GET };
++	struct ec_response_charge_control resp;
++	int ret;
++
++	lockdep_assert_held(&priv->lock);
++
++	if (priv->cmd_version < 2)
++		return -EOPNOTSUPP;
++
++	ret = cros_ec_cmd(priv->cros_ec, priv->cmd_version, EC_CMD_CHARGE_CONTROL,
++			  &req, sizeof(req), &resp, sizeof(resp));
++	if (ret < 0)
++		return ret;
++	if (ret < sizeof(resp))
++		return -EPROTO;
++
++	if (resp.sustain_soc.lower >= 0 && resp.sustain_soc.upper >= 0) {
++		if (resp.sustain_soc.upper > 100 ||
++		    resp.sustain_soc.lower > resp.sustain_soc.upper)
++			return -EINVAL;
++
++		priv->current_behaviour = POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO;
++		priv->current_end_threshold = resp.sustain_soc.upper;
++		/* v2 exposes no start threshold and keeps it equal to the end */
++		priv->current_start_threshold = priv->cmd_version == 2 ?
++			resp.sustain_soc.upper : resp.sustain_soc.lower;
++		return 0;
++	}
++
++	switch (resp.mode) {
++	case CHARGE_CONTROL_NORMAL:
++		priv->current_behaviour = POWER_SUPPLY_CHARGE_BEHAVIOUR_AUTO;
++		break;
++	case CHARGE_CONTROL_IDLE:
++		priv->current_behaviour = POWER_SUPPLY_CHARGE_BEHAVIOUR_INHIBIT_CHARGE;
++		break;
++	case CHARGE_CONTROL_DISCHARGE:
++		priv->current_behaviour = POWER_SUPPLY_CHARGE_BEHAVIOUR_FORCE_DISCHARGE;
++		break;
++	default:
++		return -EINVAL;
++	}
++	priv->current_start_threshold = 0;
++	priv->current_end_threshold = 100;
++
++	return 0;
++}
++
+ static int cros_chctl_psy_ext_get_prop(struct power_supply *psy,
+ 				       const struct power_supply_ext *ext,
+ 				       void *data,
+@@ -391,9 +451,14 @@ static int cros_chctl_probe(struct platform_device *pdev)
+ 	priv->current_start_threshold = 0;
+ 	priv->current_end_threshold = 100;
+ 
+-	/* Bring EC into well-known state */
+-	scoped_guard(mutex, &priv->lock)
+-		ret = cros_chctl_configure_ec(priv);
++	/* Take over the state the EC kept, or bring it into a well-known one */
++	scoped_guard(mutex, &priv->lock) {
++		ret = cros_chctl_read_ec(priv);
++		if (ret < 0) {
++			dev_dbg(dev, "No usable state in the EC (%d), resetting it\n", ret);
++			ret = cros_chctl_configure_ec(priv);
++		}
++	}
+ 	if (ret < 0)
+ 		return ret;
+ 
