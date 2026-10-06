@@ -148,7 +148,7 @@ Nothing here has been sent yet. Each patch set has one destination:
 | Patch set | Destination | How |
 |---|---|---|
 | Kernel camera series (0006-0022) | linux-media, linux-arm-msm, devicetree, linux-clk | 15-patch series on linux-next: `patches/kernel/README.md` "Upstreaming" |
-| Kernel charge limit (0029-0031) | linux-pm (power-supply), linux-acpi, chrome-platform | 2-patch series, applies unchanged to linux-next; same guide |
+| Kernel charge limit (0029-0031) | linux-pm (power-supply), linux-acpi, chrome-platform | 3-patch series, applies unchanged to linux-next; same guide |
 | libcamera tuning (`files/usr/share/libcamera/ipa/simple/`) | libcamera (`src/ipa/simple/data/`) | patch to libcamera-devel |
 | qmlkonsole repaint fixes | KDE invent `plasma-mobile/qmlkonsole` | merge request from `fix/stale-framebuffer` (not the parked scroll-latch patch) |
 | plasma-mobile, kscreenlocker | KDE invent `plasma/plasma-mobile`, `plasma/kscreenlocker` | merge requests from the patch files in `aports/` |
@@ -193,8 +193,8 @@ docs/               PLASMA-6.8-MIGRATION.md: moving face unlock to Plasma 6.8's 
 ## Building the kernel package by hand
 
 `patches/kernel/linux-postmarketos-qcom-sc7180/` is the full pmaports package directory
-(APKBUILD, config, 30 patches: 5 upstream pmOS, 17 camera, 6 already-upstream cci fixes,
-2 EC charge limit; see `patches/kernel/README.md`), taken at the pmaports commit in `BASE`.
+(APKBUILD, config, 31 patches: 5 upstream pmOS, 17 camera, 6 already-upstream cci fixes,
+3 EC charge limit; see `patches/kernel/README.md`), taken at the pmaports commit in `BASE`.
 
 1. In a pmaports checkout at that commit, copy the directory over `device/community/linux-postmarketos-qcom-sc7180`.
 2. `cd` into it, `abuild checksum && abuild -d` (see "Building packages").
