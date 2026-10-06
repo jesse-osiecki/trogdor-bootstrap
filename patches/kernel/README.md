@@ -16,12 +16,12 @@ with separate upstream destinations; a rebase can drop one without touching the 
 | 0001-0005 | drm/msm GPU fixes | Akhil P Oommen | **Not ours.** Shipped by the upstream pmOS aport at `BASE`; they are the aport's own `source=` patches | pmOS drops them |
 | 0006-0022 | Camera bring-up: CAMSS SC7180, CCI binding, gcc clk, ov8856 fixes, DT (CAMSS, CCI0, wormdingler sensors) | George Chan (5), Jesse Osiecki (12) | One 15-patch series to linux-media / arm-msm, see "Upstreaming" below | the series is in a stable release |
 | 0023-0028 | i2c-qcom-cci fixes | Vladimir Zapolskiy, Wenmeng Liu, Guangshuo Li | **Already upstream** (7.x); carried only because 6.18 lacks them | the kernel moves past the version that has them (the refresh script drops them by subject match) |
-| 0029-0030 | EC battery charge limit: ACPI battery-hook stubs + `cros_charge-control` without ACPI | Jesse Osiecki | Separate 2-patch series to linux-pm (power-supply) + linux-acpi, see "Upstreaming" below | the series is in a stable release |
+| 0029-0031 | EC battery charge limit: ACPI battery-hook stubs, `cros_charge-control` without ACPI, take over the limit the EC kept across a reboot | Jesse Osiecki | Separate 3-patch series to linux-pm (power-supply) + linux-acpi, see "Upstreaming" below | the series is in a stable release |
 
 Config additions per topic live in `../../scripts/kernel-config-fragment` (commented by topic).
 The kernel config in this directory already has them applied.
 
-Historical naming: the git branch that carries all of ours (0006-0030) is called
+Historical naming: the git branch that carries all of ours (0006-0031) is called
 `wormdingler-camera-<version>` (in `$CODE/linux`) and the pmaports branch `wormdingler-camera`,
 because the camera work came first. The names do not mean "camera only".
 
@@ -99,7 +99,7 @@ on next-20260903):
 | Topic | Code difference | Message difference |
 |---|---|---|
 | Camera 0006-0022 | Same changes. linux-next needed: regulators as `{ .supply = "..." }` structs, new `CAMSS_6150`/`CAMSS_6350` neighbours in the enums and switch, different DT context lines. 0017-0018 (ov8856 orientation/rotation + its binding) are **dropped**: linux-next already has them. 17 patches become 15. | Upstream messages were rewritten: full wiring description, `[Jesse Osiecki: ...]` notes on George Chan's patches, no `cherry picked from` lines, full name in `Signed-off-by`. |
-| Charge limit 0029-0030 | Identical; applies unchanged to next-20260903. | Identical apart from numbering. |
+| Charge limit 0029-0031 | Identical; applies unchanged to next-20260903. | Identical apart from numbering. |
 | cci fixes 0023-0028 | Not sent: already upstream. | |
 
 Current state (2026-09-27): both series sit on mainline `v7.3-rc4` as branches of

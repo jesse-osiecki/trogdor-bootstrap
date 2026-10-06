@@ -6,5 +6,5 @@
 CONFIG_VIDEO_OV5675=m
 CONFIG_VIDEO_OV8856=m
 CONFIG_VIDEO_DW9714=m
-# EC charge limit (battery sustainer) via cros_charge-control, patches 0029-0030
+# EC charge limit (battery sustainer) via cros_charge-control, patches 0029-0031
 CONFIG_CHARGER_CROS_CONTROL=y
