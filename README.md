@@ -197,7 +197,8 @@ docs/               PLASMA-6.8-MIGRATION.md: moving face unlock to Plasma 6.8's 
 3 EC charge limit; see `patches/kernel/README.md`), taken at the pmaports commit in `BASE`.
 
 1. In a pmaports checkout at that commit, copy the directory over `device/community/linux-postmarketos-qcom-sc7180`.
-2. `cd` into it, `abuild checksum && abuild -d` (see "Building packages").
+2. `cd` into it, `abuild checksum && abuild -d` (see "Building packages"). `prepare()` gives every build its
+   own release string, `6.18.40-r<pkgrel>` (own modules dir); keep that line.
 3. Drop the apk in `apks/`.
 
 When the camera series lands upstream this shrinks to the config change and the refresh flow retires.
