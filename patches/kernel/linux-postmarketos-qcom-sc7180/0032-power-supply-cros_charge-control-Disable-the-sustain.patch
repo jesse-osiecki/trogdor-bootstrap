@@ -1,0 +1,66 @@
+From 18fe1e167c2083f9dce8cc3d2ffce2cf46c22a6f Mon Sep 17 00:00:00 2001
+From: Jesse Osiecki <jesse@jjo.ninja>
+Date: Wed, 7 Oct 2026 18:20:15 -0400
+Subject: [PATCH] power: supply: cros_charge-control: Disable the sustainer
+ before programming it
+
+While the battery sustainer holds the state of charge inside its band,
+the EC moves its own charge mode to IDLE or DISCHARGE. On such an EC a
+SET command with mode NORMAL that arrives in that state makes the EC
+drop the sustainer, even though the command carries bounds: the EC
+returns to NORMAL with the sustainer off and charges to 100%.
+
+That bites whenever userspace writes a threshold while the battery sits
+at the limit: the write succeeds, sysfs keeps showing the threshold, and
+the EC quietly charges past it. Seen with a boot-time service that
+re-applies a stored limit, and with the Plasma settings page.
+
+Reproduced from userspace on a Lenovo IdeaPad Duet 3 (google-trogdor
+wormdingler, EC wormdingler_v2.0.6642): with the sustainer at 80/80 and
+the EC in DISCHARGE, "SET NORMAL 80/80" leaves "NORMAL -1/-1";
+"SET NORMAL -1/-1" followed by "SET NORMAL 80/80" leaves 80/80 and the
+sustainer picks the mode up again a few seconds later. The EC console
+prints "Sustain mode disabled" for the first case.
+
+So when the sustainer is being programmed, send a SET that returns to
+NORMAL with the sustainer off first, then the SET with the bounds, which
+then changes no mode and is accepted.
+
+Signed-off-by: Jesse Osiecki <jesse@jjo.ninja>
+---
+ drivers/power/supply/cros_charge-control.c | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+
+diff --git a/drivers/power/supply/cros_charge-control.c b/drivers/power/supply/cros_charge-control.c
+index a847db9f13..62af8cd368 100644
+--- a/drivers/power/supply/cros_charge-control.c
++++ b/drivers/power/supply/cros_charge-control.c
+@@ -96,6 +96,28 @@ static int cros_chctl_configure_ec(struct cros_chctl_priv *priv)
+ 		req.sustain_soc.upper = -1;
+ 	}
+ 
++	/*
++	 * While the sustainer holds the state of charge it switches the EC's
++	 * charge mode to IDLE or DISCHARGE by itself. A SET that moves the mode
++	 * back to NORMAL from there makes the EC drop the sustainer, even when
++	 * the SET carries bounds: the bounds are lost and charging resumes to
++	 * 100%. So when programming the sustainer, first return to NORMAL with
++	 * the sustainer off, then set the bounds in a second command, which no
++	 * longer changes the mode.
++	 */
++	if (req.mode == CHARGE_CONTROL_NORMAL && req.sustain_soc.lower >= 0) {
++		struct ec_params_charge_control off = {
++			.cmd = EC_CHARGE_CONTROL_CMD_SET,
++			.mode = CHARGE_CONTROL_NORMAL,
++			.sustain_soc = { .lower = -1, .upper = -1 },
++		};
++		int ret;
++
++		ret = cros_chctl_send_charge_control_cmd(priv->cros_ec, priv->cmd_version, &off);
++		if (ret < 0)
++			return ret;
++	}
++
+ 	return cros_chctl_send_charge_control_cmd(priv->cros_ec, priv->cmd_version, &req);
+ }
+ 

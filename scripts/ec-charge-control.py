@@ -10,6 +10,6 @@ def ec(cmd, ver, out=b'', insz=64):
     with open('/dev/cros_ec','rb+', buffering=0) as f:
         r = fcntl.ioctl(f, IOC, b)
     return struct.unpack_from('<IIIII', buf)[4], bytes(buf[20:20+max(r,0)])
-res, d = ec(0x0096, 2, struct.pack('<IBBHbb', 0, 1, 0, 0, 0, 0), 8)
+res, d = ec(0x0096, 2, struct.pack('<IBBbb', 0, 1, 0, 0, 0), 8)
 mode, lower, upper = struct.unpack_from('<Ibb', d)
 print('EC charge_control GET result=%d mode=%d sustain lower=%d upper=%d' % (res, mode, lower, upper))

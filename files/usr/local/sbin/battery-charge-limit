@@ -32,6 +32,9 @@ i=0; while [ $i -lt 60 ] && [ -z "$(batteries)" ]; do sleep 1; i=$((i + 1)); don
 done_any=0
 for f in $(batteries); do
 	d=${f%/*}
+	# Writing a value the driver already holds is not harmless on this EC: a SET that
+	# arrives while the sustainer has switched the charge mode itself drops the sustainer.
+	if [ "$(cat "$f")" = "$LIMIT" ]; then echo "battery-charge-limit: ${d##*/} already at $LIMIT%"; done_any=1; continue; fi
 	if echo "$LIMIT" > "$f"; then echo "battery-charge-limit: ${d##*/} limited to $LIMIT%"; done_any=1
 	else echo "battery-charge-limit: ${d##*/} rejected $LIMIT" >&2; fi
 done

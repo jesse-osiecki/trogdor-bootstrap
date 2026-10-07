@@ -3,7 +3,7 @@
 maintainer="Alicja Michalska <ellyqw@mainlining.org>"
 pkgname=linux-postmarketos-qcom-sc7180
 pkgver=6.18.40
-pkgrel=3
+pkgrel=4
 pkgdesc="Mainline kernel for Qualcomm Snapdragon 7c devices"
 arch="aarch64"
 _carch="arm64"
@@ -72,6 +72,7 @@ source="
 	0029-ACPI-battery-Provide-stubs-for-the-battery-hook-API.patch
 	0030-power-supply-cros_charge-control-Support-EC-batterie.patch
 	0031-power-supply-cros_charge-control-Take-over-the-state.patch
+	0032-power-supply-cros_charge-control-Disable-the-sustain.patch
 	$_config
 "
 builddir="$srcdir/linux-${_kernver//_/-}"
@@ -79,6 +80,9 @@ builddir="$srcdir/linux-${_kernver//_/-}"
 prepare() {
 	default_prepare
 	cp "$srcdir/config-$_flavor.$CARCH" .config
+	# One modules directory per package build (6.18.40-r3, ...): a test kernel in the
+	# second slot never shares /lib/modules with the blessed one (trogdor-bootstrap).
+	./scripts/config --set-str LOCALVERSION "-r$pkgrel"
 }
 
 build() {
@@ -148,5 +152,6 @@ bd858efc675915d357779913ee9b32ce21aaeeb09e1e7769908b011f137641da49011ea7157a76a6
 2e9cdf0751436c87a6276ede39841c0ac4bf86f3755a3523077710bc595a3f1fbe6c40a0101bd6ec952ebac581f3470d8b064f9d46b60111d073296c79f13cca  0029-ACPI-battery-Provide-stubs-for-the-battery-hook-API.patch
 d4e3b6dfff4f8e460cc8a6638f411523a1e9aab6974bc02e36c01020a79d7c50fd0209e5264b3ac686eb246f3196e5899118ddb533e692c4d3abb07bb28ec6b4  0030-power-supply-cros_charge-control-Support-EC-batterie.patch
 020a444c2957e77c28d873c80dbb529f3b36c759cf92d4f7e929edfd1b5c0b9462b608abf35d7f7bffdf8acfd787d2b263dfea892913edb89bcb6df71c7125dc  0031-power-supply-cros_charge-control-Take-over-the-state.patch
+92c15c3c70cea30ea95b5186ae8aab3251a3d16854ca915faacf2320a5a1aea861f38e19fce2d919243a4ffd2dd013c4a757c568551b11b3229eded49647b5fc  0032-power-supply-cros_charge-control-Disable-the-sustain.patch
 565de3689dd57e8a6a2104799c6944fc594d218ecf31416f0f221f8dfc21da3606446dae85dd21e24d1421082f553ac8211cf8c19b80f7b6a63ebf5aa6adbc91  config-postmarketos-qcom-sc7180.aarch64
 "
