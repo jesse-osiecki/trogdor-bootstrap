@@ -14,7 +14,7 @@ kernel_test_p4() {
 	# blessed p1 kernel lost its modules to a test build with the same release string).
 	KREL=/usr/share/kernel/${PKG#linux-}/kernel.release
 	[ "$REL_STR" != "$(cat "$KREL")" ] || die "release $REL_STR is the installed kernel's; package builds must set LOCALVERSION=-r\$pkgrel (see patches/kernel/README.md)"
-	! apk info -W "/lib/modules/$REL_STR/modules.order" >/dev/null 2>&1 || die "/lib/modules/$REL_STR belongs to an installed package; refusing to overwrite it"
+	! apk info -L "$PKG" 2>/dev/null | grep -q "^usr/lib/modules/$REL_STR/" || die "/lib/modules/$REL_STR belongs to the installed $PKG; refusing to overwrite it"
 	sudo rm -rf "/lib/modules/$REL_STR"; sudo cp -a "$MODDIR/$REL_STR" /lib/modules/; sudo chown -R root:root "/lib/modules/$REL_STR"; sudo depmod "$REL_STR"
 	W=$CODE/out/$REL_STR; rm -rf "$W/work"; mkdir -p "$W/work/dtbs"
 	cp "$T/boot/vmlinuz"* "$W/work/vmlinuz"; cp "$T"/boot/dtbs/qcom/${DTB_GLOB:-sc7180-trogdor-wormdingler-*.dtb} "$W/work/dtbs/"

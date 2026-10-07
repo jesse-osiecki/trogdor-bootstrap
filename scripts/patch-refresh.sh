@@ -406,7 +406,7 @@ install)
 	[ -f "$APK" ] || die "no built apk at $APK"
 	EXTRA=""; for s in $INSTALL_EXTRA; do EXTRA="$EXTRA $(dirname "$APK")/$s-$VER-r$REL.apk"; done
 	say "installing $(basename "$APK")$EXTRA (apk pins by checksum)"
-	if [ "$TEST" = kernel-p4 ] && [ -d "/lib/modules/$VER-r$REL" ] && ! apk info -W "/lib/modules/$VER-r$REL/modules.order" >/dev/null 2>&1; then
+	if [ "$TEST" = kernel-p4 ] && [ -d "/lib/modules/$VER-r$REL" ] && ! apk info -L "$PKG" 2>/dev/null | grep -q "^usr/lib/modules/$VER-r$REL/"; then
 		echo "removing the modules staged by --test (/lib/modules/$VER-r$REL); the package brings the same files"
 		sudo rm -rf "/lib/modules/$VER-r$REL"
 	fi
