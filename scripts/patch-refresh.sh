@@ -77,7 +77,7 @@ done
 # ---- defaults, then the project config -------------------------------------------------
 KIND=aport; PKG=; DESC=; UP_REPO=; UP_TRACK=; UP_PATH=; OUR_BRANCH=; OUR_DIR=
 PATCH_MODE=files; SRC_REPO=; SRC_BRANCH=; SRC_BRANCH_FMT=; SRC_BASE=; SRC_TAG_FMT='v%s'
-SKIP_IN_UPSTREAM=0; EXTRA_PATCHES=; CONFIG_FRAGMENT=; INSERT_ANCHOR=; VALIDATE_PREPARE=0
+SKIP_IN_UPSTREAM=0; EXTRA_PATCHES=; CONFIG_FRAGMENT=; INSERT_ANCHOR=; VALIDATE_PREPARE=0; APKBUILD_PREPARE_EXTRA=
 TEST=none; INSTALL_EXTRA=; TAG_SRC_FMT=; TAG_APORT=0; EXPORT_DIR=; BUILD_CMD=; INSTALL_CMD=
 UP_URL=; UP_CLONE_ARGS=; UP_SPARSE=; SRC_URL=; SRC_CLONE_ARGS=; REPO_PATCHES=
 . "$CONF"
@@ -312,10 +312,14 @@ if [ "$MODE" = dryrun ] || [ "$MODE" = apply ]; then
 	fi
 	for f in "$KEEP"/*.patch; do [ -f "$f" ] && { cp "$f" "$APORT/"; OURPATCHES="$OURPATCHES $(basename "$f")"; }; done
 	rm -rf "$KEEP"
-	python3 - "$APORT/APKBUILD" "$NEWVER" "$NEWREL" "$INSERT_ANCHOR" $OURPATCHES <<'EOF'
-import sys,re
+	PREPARE_EXTRA="$APKBUILD_PREPARE_EXTRA" python3 - "$APORT/APKBUILD" "$NEWVER" "$NEWREL" "$INSERT_ANCHOR" $OURPATCHES <<'EOF'
+import sys,re,os
 p,ver,rel,anchor,*patches=sys.argv[1:]
 s=open(p).read()
+extra=os.environ.get('PREPARE_EXTRA','')
+if extra and extra not in s:                            # kernel: lines appended to prepare() (per-build release string)
+    m=re.search(r'^prepare\(\) \{\n(.*?)^\}', s, re.M|re.S)
+    s=s[:m.end(1)]+''.join('\t%s\n'%l for l in extra.split('\\n'))+s[m.end(1):]
 if not re.search(r'^pkgver=.*\$', s, re.M):           # plain version: set it; 9999$_pkgver style stays
     s=re.sub(r'^pkgver=.*$', 'pkgver=%s'%ver, s, count=1, flags=re.M)
 s=re.sub(r'^pkgrel=\d+$', 'pkgrel=%s'%rel, s, count=1, flags=re.M)
@@ -402,6 +406,10 @@ install)
 	[ -f "$APK" ] || die "no built apk at $APK"
 	EXTRA=""; for s in $INSTALL_EXTRA; do EXTRA="$EXTRA $(dirname "$APK")/$s-$VER-r$REL.apk"; done
 	say "installing $(basename "$APK")$EXTRA (apk pins by checksum)"
+	if [ "$TEST" = kernel-p4 ] && [ -d "/lib/modules/$VER-r$REL" ] && ! apk info -W "/lib/modules/$VER-r$REL/modules.order" >/dev/null 2>&1; then
+		echo "removing the modules staged by --test (/lib/modules/$VER-r$REL); the package brings the same files"
+		sudo rm -rf "/lib/modules/$VER-r$REL"
+	fi
 	sudo apk add --allow-untrusted "$APK" $EXTRA
 	grep -nE "^$PKG(><|=)" /etc/apk/world
 	(cd "$HERE" && ./sync.sh >/dev/null && ./check.sh | tail -3) || true

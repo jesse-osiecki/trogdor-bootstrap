@@ -10,10 +10,14 @@ kernel_test_p4() {
 	REL_STR=$(ls "$MODDIR" 2>/dev/null | head -n1)
 	[ -n "$REL_STR" ] && [ -d "$MODDIR/$REL_STR" ] || die "no modules directory in $APK (looked in usr/lib/modules and lib/modules)"
 	echo "kernel release in package: $REL_STR"
-	sudo rm -rf "/lib/modules/$REL_STR"; sudo cp -a "$MODDIR/$REL_STR" /lib/modules/; sudo depmod "$REL_STR"
+	# Never touch the modules of a kernel that is still a boot slot (incident 2026-10-06: the
+	# blessed p1 kernel lost its modules to a test build with the same release string).
+	KREL=/usr/share/kernel/${PKG#linux-}/kernel.release
+	[ "$REL_STR" != "$(cat "$KREL")" ] || die "release $REL_STR is the installed kernel's; package builds must set LOCALVERSION=-r\$pkgrel (see patches/kernel/README.md)"
+	! apk info -W "/lib/modules/$REL_STR/modules.order" >/dev/null 2>&1 || die "/lib/modules/$REL_STR belongs to an installed package; refusing to overwrite it"
+	sudo rm -rf "/lib/modules/$REL_STR"; sudo cp -a "$MODDIR/$REL_STR" /lib/modules/; sudo chown -R root:root "/lib/modules/$REL_STR"; sudo depmod "$REL_STR"
 	W=$CODE/out/$REL_STR; rm -rf "$W/work"; mkdir -p "$W/work/dtbs"
 	cp "$T/boot/vmlinuz"* "$W/work/vmlinuz"; cp "$T"/boot/dtbs/qcom/${DTB_GLOB:-sc7180-trogdor-wormdingler-*.dtb} "$W/work/dtbs/"
-	KREL=/usr/share/kernel/${PKG#linux-}/kernel.release
 	sudo cp "$KREL" "$KREL.stock"; echo "$REL_STR" | sudo tee "$KREL" >/dev/null
 	sudo env PATH="$HERE/scripts/fake-boot-deploy:$PATH" mkinitfs -d "$W/work"; sudo mv -f "$KREL.stock" "$KREL"
 	. /usr/share/deviceinfo/deviceinfo

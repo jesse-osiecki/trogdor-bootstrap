@@ -37,6 +37,17 @@ because the camera work came first. The names do not mean "camera only".
 Tags: `wormdingler-camera/<ver>-r<rel>` on the linux branch and
 `linux-postmarketos-qcom-sc7180-<ver>-r<rel>` on pmaports mark what each built package contained.
 
+## One modules directory per package build
+
+Since 6.18.40-r3 the APKBUILD's `prepare()` sets `CONFIG_LOCALVERSION="-r$pkgrel"`, so the
+kernel release is `6.18.40-r3` and its modules live in `/lib/modules/6.18.40-r3`. Reason
+(incident 2026-10-06): the test flow stages the new package's modules on the live system while
+the blessed kernel in p1 still runs the previous build; with one shared `/lib/modules/6.18.40`
+the blessed kernel lost its modules (signed, BTF-checked: another build's modules do not load)
+and the next initramfs had no input drivers at the LUKS prompt. `patch-refresh.sh` re-adds the
+line on every regeneration (`APKBUILD_PREPARE_EXTRA` in `refresh/kernel.conf`);
+`lib-kernel-test.sh` refuses a release that equals the installed one or belongs to a package.
+
 ## Rebasing onto a newer kernel
 
 ### With the script (normal path)
@@ -77,7 +88,8 @@ Time: about 30 min plus the 2 h build.
    upstream, then delete our old `00xx-*.patch` files and
    `git -C $CODE/linux-<new> format-patch --no-signature --start-number $((N+1)) -o . v<new>..wormdingler-camera-<new>`
    where N is the number of patches upstream's `source=` already lists. Add the new names to
-   `source=` before `$_config`, bump `pkgrel`.
+   `source=` before `$_config`, bump `pkgrel`. Keep the `./scripts/config --set-str LOCALVERSION "-r$pkgrel"`
+   line in `prepare()` (see above).
 4. Config: for each line in `scripts/kernel-config-fragment`,
    `$CODE/linux-<new>/scripts/config --file config-*.aarch64 --enable|--module NAME`, then
    `make ARCH=arm64 LLVM=1 olddefconfig` with that file as `.config` and copy it back.

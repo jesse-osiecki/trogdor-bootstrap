@@ -17,6 +17,7 @@ newest upstream release. `patch-refresh.sh all` runs the check for every project
 | `SKIP_IN_UPSTREAM` | drop commits whose subject already exists between the old and new tag |
 | `EXTRA_PATCHES` | loose patch files in our aport to keep alongside the exported ones |
 | `CONFIG_FRAGMENT`, `INSERT_ANCHOR` | kernel: config additions; where patch names go in `source=` |
+| `APKBUILD_PREPARE_EXTRA` | kernel: lines appended to `prepare()` of the regenerated APKBUILD (the per-build `LOCALVERSION=-r$pkgrel`) |
 | `VALIDATE_PREPARE` | run `abuild fetch unpack prepare` to prove the patches apply |
 | `TEST` | `kernel-p4`, `none`, or a shell command |
 | `INSTALL_EXTRA` | subpackages to install with the main apk (e.g. `qmlkonsole-lang`) |
