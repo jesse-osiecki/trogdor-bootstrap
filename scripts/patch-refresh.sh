@@ -412,6 +412,15 @@ install)
 	fi
 	sudo apk add --allow-untrusted "$APK" $EXTRA
 	grep -nE "^$PKG(><|=)" /etc/apk/world
+	if [ "$TEST" = kernel-p4 ]; then
+		# The apk trigger rebuilt the initramfs and flashed the kpart to the slot we booted from
+		# (p4). The failsafe p1 still holds the previous kernel, whose modules apk just removed:
+		# mirror the new kpart there so a fallback boot is a complete system too.
+		DISK=${EMMC:-/dev/mmcblk1}
+		echo "mirroring /boot/vmlinuz.kpart to the failsafe ${DISK}p1 (priority 2, successful)"
+		sudo dd if=/boot/vmlinuz.kpart of="${DISK}p1" bs=1M conv=fsync status=none
+		sudo cgpt add -i 1 -P 2 -T 0 -S 1 "$DISK"
+	fi
 	(cd "$HERE" && ./sync.sh >/dev/null && ./check.sh | tail -3) || true
 	echo "Next: review 'git -C $HERE diff', commit, and update local_apks in group_vars/all.yml.";;
 esac

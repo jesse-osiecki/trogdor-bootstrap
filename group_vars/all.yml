@@ -28,7 +28,7 @@ zram_swap_pct: "200"
 battery_charge_limit: 80
 # Locally built packages to install from apks/ (empty = skip).
 local_apks:
-  - linux-postmarketos-qcom-sc7180-6.18.40-r1.apk
+  - linux-postmarketos-qcom-sc7180-6.18.40-r4.apk
   - qmlkonsole-26.04.2-r4.apk
   - qmlkonsole-lang-26.04.2-r4.apk
   # plasma-mobile with the lock screen re-arming Howdy on screen wake (aports/plasma-mobile)

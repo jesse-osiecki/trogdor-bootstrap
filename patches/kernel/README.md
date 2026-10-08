@@ -58,7 +58,7 @@ scripts/patch-refresh.sh kernel --dry-run    # rebase on throw-away branches, sh
 scripts/patch-refresh.sh kernel --apply      # rebase for real, regenerate the aport, commit, tag
 scripts/patch-refresh.sh kernel --build      # abuild -d, about 2 h on the tablet
 scripts/patch-refresh.sh kernel --test       # kpart to the unproven p4 slot; you reboot and bless
-scripts/patch-refresh.sh kernel --install    # apk add (pinned by checksum), sync.sh, check.sh
+scripts/patch-refresh.sh kernel --install    # apk add (pinned by checksum), kpart mirrored to p1, sync.sh, check.sh
 ```
 
 What `--apply` does, so you can judge its output:
@@ -94,6 +94,9 @@ Time: about 30 min plus the 2 h build.
    `$CODE/linux-<new>/scripts/config --file config-*.aarch64 --enable|--module NAME`, then
    `make ARCH=arm64 LLVM=1 olddefconfig` with that file as `.config` and copy it back.
 5. `abuild checksum && abuild -d`; test with `. scripts/lib-kernel-test.sh; kernel_test_p4 <apk>`.
+   After the bless, `apk add` the apk: its trigger flashes the booted slot (p4) only, so copy
+   `/boot/vmlinuz.kpart` to p1 as well (`cgpt add -i 1 -P 2 -T 0 -S 1`) or the failsafe runs a kernel
+   whose modules apk just removed.
 6. `./sync.sh`, review, commit; tag both repos.
 
 Adding a new topic: commit it at the end of `wormdingler-camera-<ver>`, add its config lines
