@@ -32,7 +32,7 @@ role, "Building packages").
 | Role | Default | Does |
 |---|---|---|
 | `base` | on | bash, keyd fixes, LED sleep hook, auto-rotation udev rule, zram, libcamera tuning, LibreWolf mobile UI, local apks |
-| `dev` | off | toolchain, pipx tools (dtschema, b4), git identity, abuild key and dirs, kernel test slot units (dead-man switch, self-test) |
+| `dev` | off | toolchain, pipx tools (dtschema, b4), git identity, abuild key and dirs, kernel test slot units (dead-man switch, self-test), ssh-agent user unit (`~/.ssh/agent.sock`, key added by hand) |
 | `unattended` | off | **insecure**: passwordless sudo, lock screen off, LUKS keyfile in the initramfs. Enrol the key with `LUKS_PASSPHRASE=... ./bootstrap.sh --tags unattended` |
 | `face_unlock` | off | Howdy from source with the PipeWire backend, config, PAM hook, enrolment launcher |
 
