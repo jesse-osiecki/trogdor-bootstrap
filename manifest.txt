@@ -22,6 +22,8 @@ dev         0644 /etc/systemd/system/kernel-deadman.service
 dev         0644 /etc/systemd/system/dmesg-live.service
 dev         0644 /etc/systemd/system/camera-selftest.service
 dev         0644 /etc/systemd/system/cgpt-mark-successful.service
+dev         0644 ~/.config/systemd/user/ssh-agent.service
+dev         0644 ~/.config/environment.d/10-ssh-agent.conf
 unattended  0755 /etc/mkinitfs/hooks-extra/00-luks-autounlock.sh
 face_unlock 0644 /etc/pam.d/kde-fingerprint
 face_unlock 0755 ~/.local/bin/howdy-add-face.sh

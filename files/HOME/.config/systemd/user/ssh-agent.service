@@ -1,0 +1,12 @@
+[Unit]
+Description=SSH key agent (socket at ~/.ssh/agent.sock; keys are added by hand with ssh-add)
+Documentation=man:ssh-agent(1)
+
+[Service]
+Type=simple
+ExecStartPre=/bin/rm -f %h/.ssh/agent.sock
+ExecStart=/usr/bin/ssh-agent -D -a %h/.ssh/agent.sock
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

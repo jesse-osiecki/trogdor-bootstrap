@@ -114,3 +114,17 @@
     - { name: camera-selftest.service,      enabled: true }
     - { name: cgpt-mark-successful.service, enabled: false }
   loop_control: { label: "{{ item.name }}" }
+
+# ssh-agent for the session (socket ~/.ssh/agent.sock, SSH_AUTH_SOCK via environment.d). The
+# key is passphrase-protected and is only ever added by hand (ssh-add), never stored.
+- name: ssh-agent user unit enabled
+  ansible.builtin.systemd:
+    scope: user
+    name: ssh-agent.service
+    enabled: true
+    daemon_reload: true
+  become: true
+  become_user: "{{ device_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ lookup('pipe', 'id -u ' ~ device_user) }}"
+    DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/{{ lookup('pipe', 'id -u ' ~ device_user) }}/bus"
