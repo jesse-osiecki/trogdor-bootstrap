@@ -34,6 +34,7 @@
       - alpine-sdk
       - postmarketos-installkernel
       - i2c-tools
+      - bluez-btmon     # HCI sniffer for BLE protocol work (taylor-scale-app)
       - v4l-utils
       - libcamera-tools
       - libcamera-v4l2
