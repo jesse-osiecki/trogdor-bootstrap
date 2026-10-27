@@ -1,0 +1,4 @@
+#!/usr/sbin/nft -f
+# Syncthing: sync traffic (22000 tcp/udp) and local discovery broadcast (21027 udp), Wi-Fi only
+add rule inet filter input iifname "wlan*" tcp dport 22000 accept comment "Syncthing sync (TCP)"
+add rule inet filter input iifname "wlan*" udp dport { 22000, 21027 } accept comment "Syncthing sync (QUIC) and local discovery"

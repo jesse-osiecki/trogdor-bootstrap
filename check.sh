@@ -2,7 +2,8 @@
 # Drift check: does the live system still match this repo?
 #   1. manifest files:  diff repo copy vs system
 #   2. line edits:      keyd ids (keyboard hash, EC buttons exclusion), zram pct,
-#                       LibreWolf stub package absent
+#                       LibreWolf stub package absent, firewall (no ufw, sshd
+#                       rule and unit match sshd_enabled)
 #   3. apk audit:       package-owned files changed under /etc (needs root)
 #   4. unmanaged:       local files in the directories we manage that the
 #                       manifest does not know about
@@ -37,6 +38,14 @@ pct=$(sed -n 's/^zram_swap_pct: *"\(.*\)"/\1/p' group_vars/all.yml)
 if grep -qx "deviceinfo_zram_swap_pct=\"$pct\"" /etc/deviceinfo; then echo "   ok      zram $pct%"; else echo "   DRIFT   zram: $(grep zram_swap_pct /etc/deviceinfo || echo unset)"; rc=1; fi
 # the stub takes the autoconfig slot from librewolf.cfg (README "What each fix does")
 if apk info -e mobile-config-firefox-librewolf >/dev/null 2>&1; then echo "   DRIFT   mobile-config-firefox-librewolf is installed (disables librewolf.cfg)"; rc=1; else echo "   ok      librewolf stub package absent"; fi
+# firewall: nftables only; sshd unit and its allow rule follow sshd_enabled (apk may bring the
+# package-owned 50_sshd.nft symlink back on a postmarketos-config-nftables upgrade)
+if apk info -e ufw iptables 2>/dev/null | grep -q .; then echo "   DRIFT   ufw/iptables installed next to nftables: $(apk info -e ufw iptables | tr '\n' ' ')"; rc=1; else echo "   ok      nftables is the only firewall"; fi
+sshd=$(sed -n 's/^sshd_enabled: *//p' inventory/host_vars/"$(hostname)".yml group_vars/all.yml | head -1)
+if [ "$sshd" = true ]; then want=enabled; rule=present; else want=disabled; rule=absent; fi
+have=$(systemctl is-enabled sshd.service 2>/dev/null | head -1); : "${have:=disabled}"   # is-enabled exits 1 for disabled
+[ -e /etc/nftables.d/50_sshd.nft ] && got=present || got=absent
+if [ "$have" = "$want" ] && [ "$got" = "$rule" ]; then echo "   ok      sshd $want, allow rule $rule"; else echo "   DRIFT   sshd unit $have (want $want), 50_sshd.nft $got (want $rule)"; rc=1; fi
 
 say "3. apk audit: package-owned files modified under /etc (U = changed)"
 # Expected U lines: deviceinfo, keyd/default.conf, pam.d/kde-fingerprint (ours);
@@ -54,7 +63,7 @@ if [ -n "$apknew" ]; then printf '%s\n' "$apknew" | sed 's|^|   MERGE   |'; echo
 say "4. unmanaged local files"
 # Paths written by templates/tasks rather than the manifest:
 known="/etc/sudoers.d/$(id -un)-nopasswd /etc/mkinitfs/files-extra/00-luks-autounlock.files"
-for d in /usr/local/sbin /usr/local/bin /usr/lib/systemd/system-sleep /etc/sysctl.d /etc/sudoers.d /etc/mkinitfs/hooks-extra /etc/mkinitfs/files-extra /etc/apk/commit_hooks.d /etc/apk/protected_paths.d; do
+for d in /usr/local/sbin /usr/local/bin /usr/lib/systemd/system-sleep /etc/sysctl.d /etc/sudoers.d /etc/mkinitfs/hooks-extra /etc/mkinitfs/files-extra /etc/apk/commit_hooks.d /etc/apk/protected_paths.d /etc/nftables.d; do
 	[ -d "$d" ] || continue
 	for f in "$d"/*; do
 		[ -f "$f" ] || continue

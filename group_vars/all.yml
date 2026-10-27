@@ -26,6 +26,13 @@ zram_swap_pct: "200"
 # boot by battery-charge-limit.service (the cros_charge-control driver resets the EC on probe and
 # PowerDevil stores nothing). Needs the kernel with patches 0029-0030 (6.18.40-r2+); harmless without.
 battery_charge_limit: 80
+# Firewall: pmOS ships nftables (postmarketos-config-nftables, input policy drop) and the base role
+# keeps it as the only firewall (ufw/iptables removed). The sshd allow rule (50_sshd.nft) and the
+# sshd unit follow this switch; pmbootstrap turns both on, a tablet on strange Wi-Fi wants them off.
+sshd_enabled: false
+# Syncthing: package, syncthing@<device_user> unit, and the LAN-only allow rule 60_syncthing.nft
+# (22000 tcp/udp, 21027 udp on wlan*; the rule is a manifest file and is installed regardless).
+syncthing_enabled: true
 # Locally built packages to install from apks/ (empty = skip).
 local_apks:
   - linux-postmarketos-qcom-sc7180-6.18.40-r4.apk

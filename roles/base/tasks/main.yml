@@ -4,7 +4,7 @@
   vars:
     apk_packages: [bash, keyd, cros-keyboard-map, libcamera-tools, pipewire-tools, librewolf, mobile-config-firefox]
 
-- name: Managed files (sleep LED hook, sysctl, accel udev rule, libcamera tuning, LibreWolf overrides, battery charge limit)
+- name: Managed files (sleep LED hook, sysctl, accel udev rule, libcamera tuning, LibreWolf overrides, battery charge limit, Syncthing nftables rule)
   ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/managed_files.yml"
   vars: { role_name: base }
 
@@ -72,6 +72,55 @@
     name: battery-charge-limit.service
     enabled: true
     daemon_reload: true
+
+# Firewall: pmOS's nftables (input policy drop, drop-ins in /etc/nftables.d) is the only
+# firewall. ufw is an iptables front end; on Alpine that runs through iptables-nft, so with
+# both installed every packet crosses two unrelated rule sets. See README "What each fix does".
+- name: "Firewall: are ufw or iptables installed"
+  ansible.builtin.command: apk info -e ufw iptables
+  register: ufw_pkgs
+  changed_when: false
+  failed_when: false
+  check_mode: false
+
+- name: "Firewall: remove ufw and iptables, nftables is the only firewall"
+  ansible.builtin.command: apk del {{ ufw_pkgs.stdout_lines | join(' ') }}
+  when: ufw_pkgs.stdout_lines | length > 0
+  notify: reload nftables
+
+- name: "Firewall: nftables.service enabled"
+  ansible.builtin.systemd:
+    name: nftables.service
+    enabled: true
+
+# sshd: pmbootstrap enables it and postmarketos-config-nftables ships the allow rule as a
+# symlink into /usr/share/nftables.avail (openssh-nftrules). Both follow sshd_enabled. apk may
+# recreate the symlink on a postmarketos-config-nftables upgrade; check.sh step 2 reports that.
+- name: "sshd: unit {{ 'enabled' if sshd_enabled else 'disabled' }}"
+  ansible.builtin.systemd:
+    name: sshd.service
+    enabled: "{{ sshd_enabled | bool }}"
+    state: "{{ 'started' if sshd_enabled else 'stopped' }}"
+
+- name: "sshd: nftables allow rule {{ 'present' if sshd_enabled else 'absent' }}"
+  ansible.builtin.file:
+    path: /etc/nftables.d/50_sshd.nft
+    src: "{{ '../../usr/share/nftables.avail/50_sshd.nft' if sshd_enabled else omit }}"
+    state: "{{ 'link' if sshd_enabled else 'absent' }}"
+  notify: reload nftables
+
+- name: "Syncthing: package"
+  ansible.builtin.include_tasks: "{{ playbook_dir }}/tasks/apk.yml"
+  vars:
+    apk_packages: [syncthing]
+  when: syncthing_enabled | bool
+
+- name: "Syncthing: syncthing@{{ device_user }} enabled (LAN ports opened by 60_syncthing.nft)"
+  ansible.builtin.systemd:
+    name: "syncthing@{{ device_user }}.service"
+    enabled: true
+    state: started
+  when: syncthing_enabled | bool
 
 - name: Locally built packages present in apks/
   ansible.builtin.stat:

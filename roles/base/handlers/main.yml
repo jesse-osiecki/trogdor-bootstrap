@@ -1,12 +1,19 @@
 ---
-# Managed files in the base role: sysctl drop-in (needs sysctl --system) and the
+# Managed files in the base role: sysctl drop-in (needs sysctl --system), the
 # accelerometer mount matrix rule (needs udev to re-read the rule and
-# iio-sensor-proxy to re-read the udev property).
+# iio-sensor-proxy to re-read the udev property) and the nftables drop-in.
 - name: base files changed
   ansible.builtin.shell: >
     sysctl --system
     && udevadm control --reload && udevadm trigger --subsystem-match=iio
     && systemctl try-restart iio-sensor-proxy
+    && nft -c -f /etc/nftables.nft && systemctl restart nftables
+  changed_when: true
+
+# Syntax-check the whole ruleset first: a bad drop-in would otherwise leave the
+# device without a firewall (nftables.service failed = no input filter).
+- name: reload nftables
+  ansible.builtin.shell: nft -c -f /etc/nftables.nft && systemctl restart nftables
   changed_when: true
 
 - name: reload keyd

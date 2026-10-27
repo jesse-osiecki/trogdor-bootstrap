@@ -13,6 +13,7 @@ base        0644 ~/.config/librewolf/librewolf/librewolf.overrides.cfg
 base        0755 /usr/local/sbin/battery-charge-limit
 base        0644 /etc/systemd/system/battery-charge-limit.service
 base        0644 /etc/udev/rules.d/90-battery-charge-limit.rules
+base        0644 /etc/nftables.d/60_syncthing.nft
 dev         0755 /usr/local/sbin/kernel-deadman
 dev         0755 /usr/local/sbin/kernel-keep
 dev         0755 /usr/local/sbin/dmesg-live
